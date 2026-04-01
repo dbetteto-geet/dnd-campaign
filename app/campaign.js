@@ -7,7 +7,14 @@ const EVENT_COLORS = { scoperta: '#7F77DD', incontro: '#1D9E75', combattimento: 
 const STATUS_COLORS = { visitato: '#1D9E75', noto: '#378ADD', sconosciuto: '#888780', pericoloso: '#D85A30' }
 const QUEST_STATUS_COLORS = { attiva: '#1D9E75', completata: '#888780', fallita: '#D85A30', in_sospeso: '#BA7517' }
 const ITEM_TYPE_COLORS = { 'Arma magica': '#7F77DD', Consumabile: '#1D9E75', Armatura: '#378ADD', Vari: '#888780', Arma: '#D85A30' }
-const SCHOOL_COLORS = { Evocazione: '#D85A30', Illusione: '#7F77DD', Necromanzia: '#5F5E5A', Trasformazione: '#1D9E75', Divinazione: '#378ADD', Ammaliamento: '#D4537E', Abiurazione: '#BA7517', Invocazione: '#0F6E56' }
+function feetToMeters(str) {
+  if (!str) return str
+  return str.replace(/(\d+)\s*feet?/gi, (_, n) => `${Math.round(parseInt(n) * 0.3)} m`)
+            .replace(/(\d+)\s*ft\.?/gi, (_, n) => `${Math.round(parseInt(n) * 0.3)} m`)
+            .replace(/(\d+)\s*mile[s]?/gi, (_, n) => `${Math.round(parseInt(n) * 1.6)} km`)
+}
+
+const SCHOOL_COLORS= { Evocazione: '#D85A30', Illusione: '#7F77DD', Necromanzia: '#5F5E5A', Trasformazione: '#1D9E75', Divinazione: '#378ADD', Ammaliamento: '#D4537E', Abiurazione: '#BA7517', Invocazione: '#0F6E56' }
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 function getPublicUrl(bucket, path) {
@@ -578,7 +585,7 @@ function SpellsSection() {
           {selected.level !== undefined && <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}><Badge color={SCHOOL_COLORS[selected.school] || '#888'}>{selected.school}</Badge><Badge color="#378ADD">{selected.level === 0 ? 'Trucchetto' : `Lv ${selected.level}`}</Badge></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-              {[['Tempo', selected.castingTime], ['Gittata', selected.range], ['Componenti', selected.components], ['Durata', selected.duration]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{k}</div><div style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>{v}</div></div>)}
+              {[['Tempo', selected.castingTime], ['Gittata', feetToMeters(selected.range)], ['Componenti', selected.components], ['Durata', feetToMeters(selected.duration)]]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{k}</div><div style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>{v}</div></div>)}
             </div>
           </>}
           <p style={{ fontSize: 15, lineHeight: 1.7, margin: 0, color: '#374151' }}>{selected.description || 'Caricamento...'}</p>
