@@ -570,7 +570,7 @@ function SpellsSection() {
       <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 12 }}>{spells.length} incantesimi da D&D 5e SRD.</p>
       <div style={{ marginBottom: 16 }}><Input placeholder="Cerca..." value={search} onChange={e => setSearch(e.target.value)} /></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%,180px),1fr))', gap: 8 }}>
-        {filtered.slice(0, 60).map(s => <Card key={s.id} onClick={() => loadDetail(s)} style={{ padding: '0.75rem 1rem' }}><div style={{ fontWeight: 500, fontSize: 15 }}>{s.name}</div></Card>)}
+        {filtered.slice(0, 60).map(s => <Card key={s.id} onClick={() => loadDetail(s)} style={{ padding: '0.75rem 1rem' }}><div style={{ fontWeight: 500, fontSize: 15, color: '#374151' }}>{s.name}</div></Card>)}
       </div>
       {filtered.length > 60 && <p style={{ fontSize: 14, color: '#9ca3af', marginTop: 12 }}>Mostrando 60 di {filtered.length}. Usa la ricerca.</p>}
       {selected && (
