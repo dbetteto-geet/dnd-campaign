@@ -1,4 +1,5 @@
 'use client'
+import Campaign from './campaign'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -6,6 +7,7 @@ import { useRouter } from 'next/navigation'
 export default function Home() {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
@@ -20,7 +22,10 @@ export default function Home() {
         .select('*')
         .eq('id', session.user.id)
         .single()
-        .then(({ data }) => setProfile(data))
+        .then(({ data }) => {
+          setProfile(data)
+          setLoading(false)
+        })
     })
   }, [])
 
@@ -29,19 +34,7 @@ export default function Home() {
     router.push('/login')
   }
 
-  if (!profile) return <div style={{ padding: '2rem' }}>Caricamento...</div>
+  if (loading) return <div style={{ padding: '2rem' }}>Caricamento...</div>
 
-  return (
-    <div style={{ padding: '2rem' }}>
-      <h1>Benvenuto, {profile.username}!</h1>
-      <p>Ruolo: {profile.role === 'dm' ? '🎲 Dungeon Master' : '⚔️ Giocatore'}</p>
-      <p style={{ color: '#888' }}>
-        Qui andrà l'app completa. Per ora tutto funziona!
-        <br />Incolla qui il componente React che ti ho fornito.
-      </p>
-      <button onClick={logout} style={{ marginTop: '1rem', padding: '8px 16px', cursor: 'pointer' }}>
-        Esci
-      </button>
-    </div>
-  )
+  return <Campaign profile={profile} />
 }
