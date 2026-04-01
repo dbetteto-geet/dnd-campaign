@@ -27,8 +27,3 @@ Per attacks usa il formato "Nome | Bonus | Danni" separato da newline. Se un cam
     return Response.json({ success: false, error: 'Parsing fallito' })
   }
 }
-```
-
-Salva e chiudi. Poi installa il SDK di Anthropic:
-```
-npm install @anthropic-ai/sdk
