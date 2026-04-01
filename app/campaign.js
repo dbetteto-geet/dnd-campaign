@@ -489,8 +489,7 @@ function MapSection({ isDM }) {
     <div key={pin.id} onClick={e => { e.stopPropagation(); setSelected(pin) }}
       style={{ position: 'absolute', left: `${pin.x_percent}%`, top: `${pin.y_percent}%`, transform: 'translate(-50%, -50%)', cursor: 'pointer', zIndex: 10 }}>
       <div style={{ width: 16, height: 16, borderRadius: '50%', background: STATUS_COLORS[pin.status] || '#888', border: '2.5px solid white', boxShadow: '0 1px 5px rgba(0,0,0,0.5)', margin: '0 auto' }} />
-      <div style={{ background: 'rgba(0,0,0,0.78)', color: '#fff', fontSize: 10, borderRadius: 4, padding: '2px 6px', whiteSpace: 'nowrap', textAlign: 'center', marginTop: 3, position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>{pin.name}</div>
-    </div>
+          </div>
   ))
 
   if (loading) return <p style={{ color: '#6b7280' }}>Caricamento...</p>
@@ -579,10 +578,10 @@ function SpellsSection() {
           {selected.level !== undefined && <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}><Badge color={SCHOOL_COLORS[selected.school] || '#888'}>{selected.school}</Badge><Badge color="#378ADD">{selected.level === 0 ? 'Trucchetto' : `Lv ${selected.level}`}</Badge></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-              {[['Tempo', selected.castingTime], ['Gittata', selected.range], ['Componenti', selected.components], ['Durata', selected.duration]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{k}</div><div style={{ fontSize: 14, fontWeight: 500 }}>{v}</div></div>)}
+              {[['Tempo', selected.castingTime], ['Gittata', selected.range], ['Componenti', selected.components], ['Durata', selected.duration]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{k}</div><div style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>{v}</div></div>)}
             </div>
           </>}
-          <p style={{ fontSize: 15, lineHeight: 1.7, margin: 0 }}>{selected.description || 'Caricamento...'}</p>
+          <p style={{ fontSize: 15, lineHeight: 1.7, margin: 0, color: '#374151' }}>{selected.description || 'Caricamento...'}</p>
         </Modal>
       )}
     </div>
