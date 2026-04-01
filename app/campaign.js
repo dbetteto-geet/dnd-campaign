@@ -585,7 +585,7 @@ function SpellsSection() {
           {selected.level !== undefined && <>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}><Badge color={SCHOOL_COLORS[selected.school] || '#888'}>{selected.school}</Badge><Badge color="#378ADD">{selected.level === 0 ? 'Trucchetto' : `Lv ${selected.level}`}</Badge></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
-              {[['Tempo', selected.castingTime], ['Gittata', feetToMeters(selected.range)], ['Componenti', selected.components], ['Durata', feetToMeters(selected.duration)]]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{k}</div><div style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>{v}</div></div>)}
+              {[['Tempo', selected.castingTime], ['Gittata', feetToMeters(selected.range)], ['Componenti', selected.components], ['Durata', feetToMeters(selected.duration)]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{k}</div><div style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>{v}</div></div>)}
             </div>
           </>}
           <p style={{ fontSize: 15, lineHeight: 1.7, margin: 0, color: '#374151' }}>{selected.description || 'Caricamento...'}</p>
