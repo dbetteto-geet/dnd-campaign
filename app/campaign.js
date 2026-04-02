@@ -7,14 +7,7 @@ const EVENT_COLORS = { scoperta: '#7F77DD', incontro: '#1D9E75', combattimento: 
 const STATUS_COLORS = { visitato: '#1D9E75', noto: '#378ADD', sconosciuto: '#888780', pericoloso: '#D85A30' }
 const QUEST_STATUS_COLORS = { attiva: '#1D9E75', completata: '#888780', fallita: '#D85A30', in_sospeso: '#BA7517' }
 const ITEM_TYPE_COLORS = { 'Arma magica': '#7F77DD', Consumabile: '#1D9E75', Armatura: '#378ADD', Vari: '#888780', Arma: '#D85A30' }
-function feetToMeters(str) {
-  if (!str) return str
-  return str.replace(/(\d+)\s*feet?/gi, (_, n) => `${Math.round(parseInt(n) * 0.3)} m`)
-            .replace(/(\d+)\s*ft\.?/gi, (_, n) => `${Math.round(parseInt(n) * 0.3)} m`)
-            .replace(/(\d+)\s*mile[s]?/gi, (_, n) => `${Math.round(parseInt(n) * 1.6)} km`)
-}
-
-const SCHOOL_COLORS= { Evocazione: '#D85A30', Illusione: '#7F77DD', Necromanzia: '#5F5E5A', Trasformazione: '#1D9E75', Divinazione: '#378ADD', Ammaliamento: '#D4537E', Abiurazione: '#BA7517', Invocazione: '#0F6E56' }
+const SCHOOL_COLORS = { Evocazione: '#D85A30', Illusione: '#7F77DD', Necromanzia: '#5F5E5A', Trasformazione: '#1D9E75', Divinazione: '#378ADD', Ammaliamento: '#D4537E', Abiurazione: '#BA7517', Invocazione: '#0F6E56' }
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 
 function getPublicUrl(bucket, path) {
@@ -28,22 +21,27 @@ async function uploadImage(bucket, file, folder) {
   if (error) return null
   return path
 }
+function feetToMeters(str) {
+  if (!str) return str
+  return str.replace(/(\d+)\s*feet?/gi, (_, n) => `${Math.round(parseInt(n) * 0.3)} m`)
+            .replace(/(\d+)\s*ft\.?/gi, (_, n) => `${Math.round(parseInt(n) * 0.3)} m`)
+            .replace(/(\d+)\s*mile[s]?/gi, (_, n) => `${Math.round(parseInt(n) * 1.6)} km`)
+}
 
 // ─── UI ───────────────────────────────────────────────────────────────────────
-
 function Badge({ color, children }) {
   return <span style={{ background: color + '22', color, border: `1px solid ${color}44`, borderRadius: 6, padding: '2px 10px', fontSize: 12, fontWeight: 500 }}>{children}</span>
 }
 function Card({ children, style, onClick }) {
-  return <div onClick={onClick} style={{ background: '#fff', border: '0.5px solid #e5e7eb', borderRadius: 12, padding: '1rem 1.25rem', cursor: onClick ? 'pointer' : 'default', ...style }}>{children}</div>
+  return <div onClick={onClick} style={{ background: '#fff', border: '0.5px solid #e5e7eb', borderRadius: 12, padding: '1rem 1.25rem', cursor: onClick ? 'pointer' : 'default', color: '#111827', ...style }}>{children}</div>
 }
 function Modal({ title, onClose, children }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-      <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', padding: '1.5rem', width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto' }}>
+      <div style={{ background: '#fff', borderRadius: '16px 16px 0 0', padding: '1.5rem', width: '100%', maxWidth: 640, maxHeight: '90vh', overflowY: 'auto', color: '#111827' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-          <h3 style={{ margin: 0, fontWeight: 600, fontSize: 18 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 26, cursor: 'pointer', color: '#6b7280', padding: '0 4px' }}>×</button>
+          <h3 style={{ margin: 0, fontWeight: 600, fontSize: 18, color: '#111827' }}>{title}</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 26, cursor: 'pointer', color: '#6b7280', padding: 4 }}>×</button>
         </div>
         {children}
       </div>
@@ -54,13 +52,13 @@ function FF({ label, children }) {
   return <div style={{ marginBottom: '1rem' }}><label style={{ display: 'block', fontSize: 13, color: '#6b7280', marginBottom: 4 }}>{label}</label>{children}</div>
 }
 function Input(props) {
-  return <input style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 16 }} {...props} />
+  return <input style={{ width: '100%', boxSizing: 'border-box', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 16, color: '#111827', background: '#fff' }} {...props} />
 }
 function Textarea(props) {
-  return <textarea style={{ width: '100%', boxSizing: 'border-box', minHeight: 90, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 16, resize: 'vertical' }} {...props} />
+  return <textarea style={{ width: '100%', boxSizing: 'border-box', minHeight: 90, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 16, resize: 'vertical', color: '#111827', background: '#fff' }} {...props} />
 }
 function Sel({ children, ...props }) {
-  return <select style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 16, background: '#fff' }} {...props}>{children}</select>
+  return <select style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 16, background: '#fff', color: '#111827' }} {...props}>{children}</select>
 }
 function BtnP({ children, onClick, style, disabled }) {
   return <button onClick={onClick} disabled={disabled} style={{ background: disabled ? '#9ca3af' : '#1D9E75', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 600, cursor: disabled ? 'not-allowed' : 'pointer', minHeight: 44, ...style }}>{children}</button>
@@ -72,7 +70,7 @@ function BtnD({ children, onClick }) {
   return <button onClick={onClick} style={{ background: '#fee2e2', color: '#dc2626', border: '1px solid #fca5a5', borderRadius: 10, padding: '10px 14px', fontSize: 14, cursor: 'pointer', minHeight: 44 }}>{children}</button>
 }
 function SH({ title, action }) {
-  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', gap: 8, flexWrap: 'wrap' }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>{title}</h2>{action}</div>
+  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', gap: 8, flexWrap: 'wrap' }}><h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#111827' }}>{title}</h2>{action}</div>
 }
 function Tabs({ tabs, active, onChange }) {
   return (
@@ -96,7 +94,7 @@ function ImgUpload({ bucket, folder, currentPath, onUploaded, label }) {
       <label style={{ display: 'block', fontSize: 13, color: '#6b7280', marginBottom: 4 }}>{label || 'Immagine'}</label>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {url && <img src={url} alt="" style={{ width: 52, height: 52, borderRadius: 8, objectFit: 'cover', border: '1px solid #e5e7eb' }} />}
-        <button type="button" onClick={() => ref.current.click()} style={{ background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 16px', fontSize: 14, cursor: 'pointer', minHeight: 44 }}>
+        <button type="button" onClick={() => ref.current.click()} style={{ background: '#f9fafb', border: '1px solid #d1d5db', borderRadius: 10, padding: '10px 16px', fontSize: 14, cursor: 'pointer', minHeight: 44, color: '#374151' }}>
           {uploading ? 'Caricamento...' : url ? 'Cambia' : 'Carica immagine'}
         </button>
         <input ref={ref} type="file" accept="image/*" style={{ display: 'none' }} onChange={handle} />
@@ -105,8 +103,47 @@ function ImgUpload({ bucket, folder, currentPath, onUploaded, label }) {
   )
 }
 
-// ─── Monete ───────────────────────────────────────────────────────────────────
+// ─── Trascrizione note con AI ─────────────────────────────────────────────────
+function NotePhotoScanner({ onTranscribed }) {
+  const [scanning, setScanning] = useState(false)
+  const [error, setError] = useState('')
+  const ref = useRef()
 
+  const handle = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    setScanning(true); setError('')
+    const reader = new FileReader()
+    reader.onload = async (ev) => {
+      try {
+        const res = await fetch('/api/transcribe-note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: ev.target.result.split(',')[1], mediaType: file.type })
+        })
+        const data = await res.json()
+        if (data.success) { onTranscribed(data.text) }
+        else { setError('Trascrizione fallita. Scrivi manualmente.') }
+      } catch { setError('Errore di connessione.') }
+      setScanning(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10, padding: '1rem', marginBottom: '1rem' }}>
+      <p style={{ fontSize: 14, fontWeight: 600, color: '#1e40af', margin: '0 0 6px' }}>📷 Trascrivi appunti con AI</p>
+      <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 10px' }}>Fotografa i tuoi appunti — Claude li trascriverà automaticamente.</p>
+      <button type="button" onClick={() => ref.current.click()} disabled={scanning}
+        style={{ background: '#2563eb', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: scanning ? 'not-allowed' : 'pointer', minHeight: 44, opacity: scanning ? 0.7 : 1 }}>
+        {scanning ? '⏳ Trascrizione...' : '📷 Fotografa appunti'}
+      </button>
+      <input ref={ref} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handle} />
+      {error && <p style={{ color: '#dc2626', fontSize: 13, marginTop: 8, marginBottom: 0 }}>{error}</p>}
+    </div>
+  )
+}
+
+// ─── Monete ───────────────────────────────────────────────────────────────────
 function CoinsPanel({ values, onChange, editable }) {
   const COINS = [
     { key: 'gold', label: 'MO', color: '#B45309', bg: '#fffbeb', border: '#fde68a' },
@@ -116,7 +153,7 @@ function CoinsPanel({ values, onChange, editable }) {
   ]
   return (
     <Card style={{ marginBottom: 16 }}>
-      <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 12px' }}>Monete</p>
+      <p style={{ fontSize: 13, fontWeight: 600, margin: '0 0 12px', color: '#374151' }}>Monete</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
         {COINS.map(({ key, label, color, bg, border }) => (
           <div key={key} style={{ textAlign: 'center', background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: '10px 4px' }}>
@@ -134,7 +171,6 @@ function CoinsPanel({ values, onChange, editable }) {
 }
 
 // ─── Tira Dadi ────────────────────────────────────────────────────────────────
-
 function DiceSection() {
   const DICE = [4, 6, 8, 10, 12, 20, 100]
   const DC = { 4: '#7F77DD', 6: '#1D9E75', 8: '#D85A30', 10: '#378ADD', 12: '#D4537E', 20: '#BA7517', 100: '#5F5E5A' }
@@ -187,18 +223,15 @@ function DiceSection() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 14, borderTop: '1px solid #f3f4f6', marginBottom: 16 }}>
           <span style={{ fontSize: 14, color: '#6b7280' }}>Modificatore:</span>
-          <button onClick={() => setMod(m => m - 1)} style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: 18, cursor: 'pointer' }}>−</button>
+          <button onClick={() => setMod(m => m - 1)} style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: 18, cursor: 'pointer', color: '#374151' }}>−</button>
           <span style={{ fontSize: 18, fontWeight: 700, minWidth: 34, textAlign: 'center', color: mod > 0 ? '#1D9E75' : mod < 0 ? '#D85A30' : '#9ca3af' }}>{mod > 0 ? '+' + mod : mod}</span>
-          <button onClick={() => setMod(m => m + 1)} style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: 18, cursor: 'pointer' }}>+</button>
+          <button onClick={() => setMod(m => m + 1)} style={{ width: 34, height: 34, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', fontSize: 18, cursor: 'pointer', color: '#374151' }}>+</button>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <BtnP onClick={roll} disabled={total === 0 || rolling} style={{ flex: 1, fontSize: 17 }}>
-            {rolling ? '🎲 ...' : `🎲 Tira${total > 0 ? ` (${total})` : ''}`}
-          </BtnP>
+          <BtnP onClick={roll} disabled={total === 0 || rolling} style={{ flex: 1, fontSize: 17 }}>{rolling ? '🎲 ...' : `🎲 Tira${total > 0 ? ` (${total})` : ''}`}</BtnP>
           <BtnS onClick={reset} style={{ minWidth: 80 }}>Reset</BtnS>
         </div>
       </Card>
-
       {result && (
         <Card style={{ marginBottom: 16, border: '2px solid #1D9E75', background: '#f0fdf4' }}>
           <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>{result.label}</div>
@@ -209,12 +242,7 @@ function DiceSection() {
                 <span style={{ fontSize: 9, color: DC[r.f] + 'aa' }}>d{r.f}</span>
               </div>
             ))}
-            {result.mod !== 0 && (
-              <div style={{ width: 46, height: 46, borderRadius: 10, background: '#f3f4f6', border: '2px solid #e5e7eb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: result.mod > 0 ? '#1D9E75' : '#D85A30', lineHeight: 1 }}>{result.mod > 0 ? '+' : ''}{result.mod}</span>
-                <span style={{ fontSize: 9, color: '#9ca3af' }}>mod</span>
-              </div>
-            )}
+            {result.mod !== 0 && <div style={{ width: 46, height: 46, borderRadius: 10, background: '#f3f4f6', border: '2px solid #e5e7eb', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}><span style={{ fontSize: 14, fontWeight: 700, color: result.mod > 0 ? '#1D9E75' : '#D85A30', lineHeight: 1 }}>{result.mod > 0 ? '+' : ''}{result.mod}</span><span style={{ fontSize: 9, color: '#9ca3af' }}>mod</span></div>}
           </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 14, color: '#6b7280' }}>Totale:</span>
@@ -222,7 +250,6 @@ function DiceSection() {
           </div>
         </Card>
       )}
-
       {history.length > 1 && (
         <div>
           <p style={{ fontSize: 13, fontWeight: 600, color: '#9ca3af', marginBottom: 8 }}>Tiri precedenti</p>
@@ -230,7 +257,7 @@ function DiceSection() {
             <Card key={i} style={{ padding: '0.6rem 1rem', marginBottom: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 13, color: '#6b7280' }}>{h.label}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 20, fontWeight: 700 }}>{h.sum}</span>
+                <span style={{ fontSize: 20, fontWeight: 700, color: '#111827' }}>{h.sum}</span>
                 <span style={{ fontSize: 11, color: '#9ca3af' }}>{h.time}</span>
               </div>
             </Card>
@@ -242,7 +269,6 @@ function DiceSection() {
 }
 
 // ─── Sessioni ─────────────────────────────────────────────────────────────────
-
 function SessionsSection({ isDM }) {
   const [sessions, setSessions] = useState([])
   const [expanded, setExpanded] = useState(null)
@@ -251,21 +277,14 @@ function SessionsSection({ isDM }) {
   const [form, setForm] = useState({ number: '', title: '', date: '', summary: '' })
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    supabase.from('sessions').select('*').order('number').then(({ data }) => { setSessions(data || []); setLoading(false) })
-  }, [])
+  useEffect(() => { supabase.from('sessions').select('*').order('number').then(({ data }) => { setSessions(data || []); setLoading(false) }) }, [])
 
   const openAdd = () => { setEditing(null); setForm({ number: '', title: '', date: '', summary: '' }); setShowModal(true) }
   const openEdit = (e, s) => { e.stopPropagation(); setEditing(s); setForm({ number: s.number, title: s.title, date: s.date || '', summary: s.summary || '' }); setShowModal(true) }
   const save = async () => {
     if (!form.title) return
-    if (editing) {
-      const { data } = await supabase.from('sessions').update(form).eq('id', editing.id).select()
-      if (data) setSessions(sessions.map(s => s.id === editing.id ? data[0] : s))
-    } else {
-      const { data } = await supabase.from('sessions').insert([form]).select()
-      if (data) setSessions([...sessions, data[0]])
-    }
+    if (editing) { const { data } = await supabase.from('sessions').update(form).eq('id', editing.id).select(); if (data) setSessions(sessions.map(s => s.id === editing.id ? data[0] : s)) }
+    else { const { data } = await supabase.from('sessions').insert([form]).select(); if (data) setSessions([...sessions, data[0]]) }
     setShowModal(false)
   }
   const remove = async (e, id) => { e.stopPropagation(); await supabase.from('sessions').delete().eq('id', id); setSessions(sessions.filter(s => s.id !== id)) }
@@ -279,13 +298,13 @@ function SessionsSection({ isDM }) {
         {sessions.map(s => (
           <Card key={s.id} onClick={() => setExpanded(expanded === s.id ? null : s.id)}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div><span style={{ fontSize: 12, color: '#9ca3af', display: 'block', marginBottom: 2 }}>Sessione {s.number} · {s.date}</span><span style={{ fontWeight: 600 }}>{s.title}</span></div>
+              <div><span style={{ fontSize: 12, color: '#9ca3af', display: 'block', marginBottom: 2 }}>Sessione {s.number} · {s.date}</span><span style={{ fontWeight: 600, color: '#111827' }}>{s.title}</span></div>
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                 {isDM && <><button onClick={e => openEdit(e, s)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button><button onClick={e => remove(e, s.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>🗑️</button></>}
                 <span style={{ color: '#9ca3af' }}>{expanded === s.id ? '▲' : '▼'}</span>
               </div>
             </div>
-            {expanded === s.id && <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.7, color: '#6b7280', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>{s.summary}</p>}
+            {expanded === s.id && <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.7, color: '#374151', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>{s.summary}</p>}
           </Card>
         ))}
       </div>
@@ -303,7 +322,6 @@ function SessionsSection({ isDM }) {
 }
 
 // ─── NPC ──────────────────────────────────────────────────────────────────────
-
 function NPCSection({ isDM }) {
   const [npcs, setNpcs] = useState([])
   const [selected, setSelected] = useState(null)
@@ -318,13 +336,8 @@ function NPCSection({ isDM }) {
   const openEdit = (e, npc) => { e && e.stopPropagation(); setEditing(npc); setForm({ name: npc.name, role: npc.role || '', attitude: npc.attitude, description: npc.description || '', notes_dm: npc.notes_dm || '', image_path: npc.image_path || '' }); setShowModal(true) }
   const save = async () => {
     if (!form.name) return
-    if (editing) {
-      const { data } = await supabase.from('npcs').update(form).eq('id', editing.id).select()
-      if (data) { setNpcs(npcs.map(n => n.id === editing.id ? data[0] : n)); if (selected?.id === editing.id) setSelected(data[0]) }
-    } else {
-      const { data } = await supabase.from('npcs').insert([form]).select()
-      if (data) setNpcs([...npcs, data[0]])
-    }
+    if (editing) { const { data } = await supabase.from('npcs').update(form).eq('id', editing.id).select(); if (data) { setNpcs(npcs.map(n => n.id === editing.id ? data[0] : n)); if (selected?.id === editing.id) setSelected(data[0]) } }
+    else { const { data } = await supabase.from('npcs').insert([form]).select(); if (data) setNpcs([...npcs, data[0]]) }
     setShowModal(false)
   }
   const remove = async (id) => { await supabase.from('npcs').delete().eq('id', id); setNpcs(npcs.filter(n => n.id !== id)); setSelected(null) }
@@ -342,7 +355,7 @@ function NPCSection({ isDM }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                 {img ? <img src={img} alt={npc.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                   : <div style={{ width: 44, height: 44, borderRadius: '50%', background: (ATTITUDE_COLORS[npc.attitude] || '#888') + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 600, color: ATTITUDE_COLORS[npc.attitude] || '#888', flexShrink: 0 }}>{npc.name[0]}</div>}
-                <div><div style={{ fontWeight: 600 }}>{npc.name}</div><div style={{ fontSize: 13, color: '#9ca3af' }}>{npc.role}</div></div>
+                <div><div style={{ fontWeight: 600, color: '#111827' }}>{npc.name}</div><div style={{ fontSize: 13, color: '#9ca3af' }}>{npc.role}</div></div>
               </div>
               <Badge color={ATTITUDE_COLORS[npc.attitude] || '#888'}>{npc.attitude}</Badge>
               <p style={{ fontSize: 14, color: '#6b7280', marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>{npc.description}</p>
@@ -356,7 +369,7 @@ function NPCSection({ isDM }) {
           <Modal title={selected.name} onClose={() => setSelected(null)}>
             {img && <img src={img} alt={selected.name} style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 12 }} />}
             <div style={{ marginBottom: 8 }}><Badge color={ATTITUDE_COLORS[selected.attitude] || '#888'}>{selected.attitude}</Badge><span style={{ fontSize: 14, color: '#6b7280', marginLeft: 8 }}>{selected.role}</span></div>
-            <p style={{ fontSize: 15, lineHeight: 1.7 }}>{selected.description}</p>
+            <p style={{ fontSize: 15, lineHeight: 1.7, color: '#374151' }}>{selected.description}</p>
             {isDM && selected.notes_dm && <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '0.75rem 1rem', marginTop: 12 }}><span style={{ fontSize: 12, fontWeight: 600, color: '#92400e', display: 'block', marginBottom: 4 }}>Note DM</span><span style={{ fontSize: 14, color: '#6b7280' }}>{selected.notes_dm}</span></div>}
             {isDM && <div style={{ display: 'flex', gap: 8, marginTop: 16 }}><BtnS onClick={() => openEdit(null, selected)}>✏️ Modifica</BtnS><BtnD onClick={() => remove(selected.id)}>🗑️ Elimina</BtnD></div>}
           </Modal>
@@ -378,7 +391,6 @@ function NPCSection({ isDM }) {
 }
 
 // ─── Timeline ─────────────────────────────────────────────────────────────────
-
 function TimelineSection({ isDM }) {
   const [events, setEvents] = useState([])
   const [showModal, setShowModal] = useState(false)
@@ -392,13 +404,8 @@ function TimelineSection({ isDM }) {
   const openEdit = (e, ev) => { e.stopPropagation(); setEditing(ev); setForm({ date_ingame: ev.date_ingame || '', title: ev.title, description: ev.description || '', type: ev.type }); setShowModal(true) }
   const save = async () => {
     if (!form.title) return
-    if (editing) {
-      const { data } = await supabase.from('timeline_events').update(form).eq('id', editing.id).select()
-      if (data) setEvents(events.map(e => e.id === editing.id ? data[0] : e))
-    } else {
-      const { data } = await supabase.from('timeline_events').insert([form]).select()
-      if (data) setEvents([...events, data[0]])
-    }
+    if (editing) { const { data } = await supabase.from('timeline_events').update(form).eq('id', editing.id).select(); if (data) setEvents(events.map(e => e.id === editing.id ? data[0] : e)) }
+    else { const { data } = await supabase.from('timeline_events').insert([form]).select(); if (data) setEvents([...events, data[0]]) }
     setShowModal(false)
   }
   const remove = async (e, id) => { e.stopPropagation(); await supabase.from('timeline_events').delete().eq('id', id); setEvents(events.filter(ev => ev.id !== id)) }
@@ -415,7 +422,7 @@ function TimelineSection({ isDM }) {
             <div style={{ position: 'absolute', left: -20, top: 8, width: 12, height: 12, borderRadius: '50%', background: EVENT_COLORS[ev.type] || '#888', border: '2px solid #fff' }} />
             <Card>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div><span style={{ fontSize: 12, color: '#9ca3af' }}>{ev.date_ingame}</span><div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontWeight: 600 }}>{ev.title}</span><Badge color={EVENT_COLORS[ev.type] || '#888'}>{ev.type}</Badge></div></div>
+                <div><span style={{ fontSize: 12, color: '#9ca3af' }}>{ev.date_ingame}</span><div style={{ display: 'flex', gap: 8, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontWeight: 600, color: '#111827' }}>{ev.title}</span><Badge color={EVENT_COLORS[ev.type] || '#888'}>{ev.type}</Badge></div></div>
                 {isDM && <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}><button onClick={e => openEdit(e, ev)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button><button onClick={e => remove(e, ev.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>🗑️</button></div>}
               </div>
               <p style={{ margin: '8px 0 0', fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>{ev.description}</p>
@@ -437,7 +444,6 @@ function TimelineSection({ isDM }) {
 }
 
 // ─── Mappa ────────────────────────────────────────────────────────────────────
-
 function MapSection({ isDM }) {
   const [pins, setPins] = useState([])
   const [mapUrl, setMapUrl] = useState(null)
@@ -480,13 +486,8 @@ function MapSection({ isDM }) {
 
   const savePin = async () => {
     if (!form.name) return
-    if (editingPin) {
-      const { data } = await supabase.from('map_pins').update(form).eq('id', editingPin.id).select()
-      if (data) setPins(pins.map(p => p.id === editingPin.id ? data[0] : p))
-    } else if (pendingPos) {
-      const { data } = await supabase.from('map_pins').insert([{ ...form, ...pendingPos }]).select()
-      if (data) setPins([...pins, data[0]])
-    }
+    if (editingPin) { const { data } = await supabase.from('map_pins').update(form).eq('id', editingPin.id).select(); if (data) setPins(pins.map(p => p.id === editingPin.id ? data[0] : p)) }
+    else if (pendingPos) { const { data } = await supabase.from('map_pins').insert([{ ...form, ...pendingPos }]).select(); if (data) setPins([...pins, data[0]]) }
     setShowPinModal(false); setPendingPos(null); setEditingPin(null)
   }
 
@@ -495,8 +496,8 @@ function MapSection({ isDM }) {
   const renderPins = () => pins.map(pin => (
     <div key={pin.id} onClick={e => { e.stopPropagation(); setSelected(pin) }}
       style={{ position: 'absolute', left: `${pin.x_percent}%`, top: `${pin.y_percent}%`, transform: 'translate(-50%, -50%)', cursor: 'pointer', zIndex: 10 }}>
-      <div style={{ width: 16, height: 16, borderRadius: '50%', background: STATUS_COLORS[pin.status] || '#888', border: '2.5px solid white', boxShadow: '0 1px 5px rgba(0,0,0,0.5)', margin: '0 auto' }} />
-          </div>
+      <div style={{ width: 16, height: 16, borderRadius: '50%', background: STATUS_COLORS[pin.status] || '#888', border: '2.5px solid white', boxShadow: '0 1px 5px rgba(0,0,0,0.5)' }} />
+    </div>
   ))
 
   if (loading) return <p style={{ color: '#6b7280' }}>Caricamento...</p>
@@ -527,7 +528,7 @@ function MapSection({ isDM }) {
       {selected && (
         <Modal title={selected.name} onClose={() => setSelected(null)}>
           <Badge color={STATUS_COLORS[selected.status] || '#888'}>{selected.status}</Badge>
-          <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.7 }}>{selected.description}</p>
+          <p style={{ marginTop: 12, fontSize: 15, lineHeight: 1.7, color: '#374151' }}>{selected.description}</p>
           {isDM && <div style={{ display: 'flex', gap: 8, marginTop: 12 }}><BtnS onClick={e => openEditPin(e, selected)}>✏️ Modifica</BtnS><BtnD onClick={() => removePin(selected.id)}>🗑️ Elimina</BtnD></div>}
         </Modal>
       )}
@@ -550,8 +551,7 @@ function MapSection({ isDM }) {
   )
 }
 
-// ─── Incantesimi ──────────────────────────────────────────────────────────────
-
+// ─── Incantesimi compendio ─────────────────────────────────────────────────────
 function SpellsSection() {
   const [spells, setSpells] = useState([])
   const [search, setSearch] = useState('')
@@ -566,7 +566,7 @@ function SpellsSection() {
     if (spell.level !== undefined) { setSelected(spell); return }
     const res = await fetch(`https://www.dnd5eapi.co/api/spells/${spell.index}`)
     const d = await res.json()
-    setSelected({ ...spell, level: d.level, school: d.school?.name || '', castingTime: d.casting_time, range: d.range, components: (d.components || []).join(', '), duration: d.duration, description: (d.desc || []).join(' ') })
+    setSelected({ ...spell, level: d.level, school: d.school?.name || '', castingTime: d.casting_time, range: d.range, components: (d.components || []).join(', '), duration: d.duration, description: (d.desc || []).join(' '), concentration: d.concentration, ritual: d.ritual })
   }
 
   const filtered = spells.filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()))
@@ -577,13 +577,18 @@ function SpellsSection() {
       <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 12 }}>{spells.length} incantesimi da D&D 5e SRD.</p>
       <div style={{ marginBottom: 16 }}><Input placeholder="Cerca..." value={search} onChange={e => setSearch(e.target.value)} /></div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%,180px),1fr))', gap: 8 }}>
-        {filtered.slice(0, 60).map(s => <Card key={s.id} onClick={() => loadDetail(s)} style={{ padding: '0.75rem 1rem' }}><div style={{ fontWeight: 500, fontSize: 15, color: '#374151' }}>{s.name}</div></Card>)}
+        {filtered.slice(0, 60).map(s => <Card key={s.id} onClick={() => loadDetail(s)} style={{ padding: '0.75rem 1rem' }}><div style={{ fontWeight: 500, fontSize: 15, color: '#111827' }}>{s.name}</div></Card>)}
       </div>
       {filtered.length > 60 && <p style={{ fontSize: 14, color: '#9ca3af', marginTop: 12 }}>Mostrando 60 di {filtered.length}. Usa la ricerca.</p>}
       {selected && (
         <Modal title={selected.name} onClose={() => setSelected(null)}>
           {selected.level !== undefined && <>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}><Badge color={SCHOOL_COLORS[selected.school] || '#888'}>{selected.school}</Badge><Badge color="#378ADD">{selected.level === 0 ? 'Trucchetto' : `Lv ${selected.level}`}</Badge></div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+              <Badge color={SCHOOL_COLORS[selected.school] || '#888'}>{selected.school}</Badge>
+              <Badge color="#378ADD">{selected.level === 0 ? 'Trucchetto' : `Lv ${selected.level}`}</Badge>
+              {selected.concentration && <Badge color="#D4537E">Concentrazione</Badge>}
+              {selected.ritual && <Badge color="#BA7517">Rituale</Badge>}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
               {[['Tempo', selected.castingTime], ['Gittata', feetToMeters(selected.range)], ['Componenti', selected.components], ['Durata', feetToMeters(selected.duration)]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '8px 10px' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 2 }}>{k}</div><div style={{ fontSize: 14, fontWeight: 500, color: '#374151' }}>{v}</div></div>)}
             </div>
@@ -596,7 +601,6 @@ function SpellsSection() {
 }
 
 // ─── Note DM ──────────────────────────────────────────────────────────────────
-
 function DMNotesSection() {
   const [content, setContent] = useState('')
   const [editing, setEditing] = useState(false)
@@ -616,17 +620,18 @@ function DMNotesSection() {
     <div>
       <SH title="Note Private DM" action={editing ? <BtnP onClick={save}>Salva</BtnP> : <BtnS onClick={() => setEditing(true)}>Modifica</BtnS>} />
       <Card style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
-        {editing
-          ? <textarea value={content} onChange={e => setContent(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 200, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, lineHeight: 1.8, resize: 'vertical' }} />
-          : <pre style={{ margin: 0, fontFamily: 'inherit', fontSize: 15, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{content || 'Nessuna nota.'}</pre>
-        }
+        {editing ? (
+          <div>
+            <NotePhotoScanner onTranscribed={text => setContent(c => c ? c + '\n\n' + text : text)} />
+            <textarea value={content} onChange={e => setContent(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 200, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, lineHeight: 1.8, resize: 'vertical', color: '#111827' }} />
+          </div>
+        ) : <pre style={{ margin: 0, fontFamily: 'inherit', fontSize: 15, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: '#374151' }}>{content || 'Nessuna nota.'}</pre>}
       </Card>
     </div>
   )
 }
 
 // ─── SheetScanner ─────────────────────────────────────────────────────────────
-
 function SheetScanner({ onParsed }) {
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState('')
@@ -652,17 +657,215 @@ function SheetScanner({ onParsed }) {
       <p style={{ fontSize: 14, fontWeight: 600, color: '#166534', margin: '0 0 6px' }}>📷 Scansiona scheda con AI</p>
       <p style={{ fontSize: 14, color: '#6b7280', margin: '0 0 10px' }}>Fai una foto alla scheda — Claude la legge e compila i campi.</p>
       <button type="button" onClick={() => ref.current.click()} disabled={scanning}
-        style={{ background: '#1D9E75', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 15, fontWeight: 600, cursor: scanning ? 'not-allowed' : 'pointer', minHeight: 44, opacity: scanning ? 0.7 : 1 }}>
+        style={{ background: '#1D9E75', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: scanning ? 'not-allowed' : 'pointer', minHeight: 44, opacity: scanning ? 0.7 : 1 }}>
         {scanning ? '⏳ Analisi...' : '📷 Carica foto'}
       </button>
       <input ref={ref} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handle} />
-      {error && <p style={{ color: '#dc2626', fontSize: 14, marginTop: 8, marginBottom: 0 }}>{error}</p>}
+      {error && <p style={{ color: '#dc2626', fontSize: 13, marginTop: 8, marginBottom: 0 }}>{error}</p>}
+    </div>
+  )
+}
+
+// ─── Libro degli incantesimi del PG ──────────────────────────────────────────
+function SpellbookTab({ playerId, isOwner }) {
+  const [spells, setSpells] = useState([])
+  const [srdSpells, setSrdSpells] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [showCustomModal, setShowCustomModal] = useState(false)
+  const [srdSearch, setSrdSearch] = useState('')
+  const [srdLoading, setSrdLoading] = useState(false)
+  const [selectedSrd, setSelectedSrd] = useState(null)
+  const [customForm, setCustomForm] = useState({ spell_name: '', spell_level: 0, school: '', casting_time: '1 azione', is_concentration: false, is_bonus_action: false, is_ritual: false, description: '' })
+
+  useEffect(() => {
+    supabase.from('character_spells').select('*').eq('player_id', playerId).order('spell_level').then(({ data }) => { setSpells(data || []); setLoading(false) })
+  }, [playerId])
+
+  const searchSrd = async (q) => {
+    if (!q || q.length < 2) { setSrdSpells([]); return }
+    setSrdLoading(true)
+    try {
+      const res = await fetch(`https://www.dnd5eapi.co/api/spells?limit=500`)
+      const data = await res.json()
+      const filtered = (data.results || []).filter(s => s.name.toLowerCase().includes(q.toLowerCase())).slice(0, 20)
+      setSrdSpells(filtered)
+    } catch {}
+    setSrdLoading(false)
+  }
+
+  const loadSrdDetail = async (spell) => {
+    const res = await fetch(`https://www.dnd5eapi.co/api/spells/${spell.index}`)
+    const d = await res.json()
+    setSelectedSrd({ name: spell.name, level: d.level, school: d.school?.name || '', castingTime: d.casting_time, concentration: d.concentration, ritual: d.ritual, description: (d.desc || []).join(' '), isBonus: d.casting_time?.toLowerCase().includes('bonus') })
+  }
+
+  const addFromSrd = async () => {
+    if (!selectedSrd) return
+    const { data } = await supabase.from('character_spells').insert([{
+      player_id: playerId,
+      spell_name: selectedSrd.name,
+      spell_level: selectedSrd.level,
+      school: selectedSrd.school,
+      casting_time: selectedSrd.castingTime,
+      is_concentration: selectedSrd.concentration || false,
+      is_bonus_action: selectedSrd.isBonus || false,
+      is_ritual: selectedSrd.ritual || false,
+      description: selectedSrd.description,
+      is_custom: false,
+    }]).select()
+    if (data) { setSpells([...spells, data[0]]) }
+    setShowAddModal(false); setSelectedSrd(null); setSrdSearch(''); setSrdSpells([])
+  }
+
+  const addCustom = async () => {
+    if (!customForm.spell_name) return
+    const { data } = await supabase.from('character_spells').insert([{ ...customForm, player_id: playerId, is_custom: true }]).select()
+    if (data) { setSpells([...spells, data[0]]) }
+    setShowCustomModal(false)
+    setCustomForm({ spell_name: '', spell_level: 0, school: '', casting_time: '1 azione', is_concentration: false, is_bonus_action: false, is_ritual: false, description: '' })
+  }
+
+  const toggleField = async (spell, field) => {
+    const newVal = !spell[field]
+    await supabase.from('character_spells').update({ [field]: newVal }).eq('id', spell.id)
+    setSpells(spells.map(s => s.id === spell.id ? { ...s, [field]: newVal } : s))
+  }
+
+  const removeSpell = async (id) => {
+    await supabase.from('character_spells').delete().eq('id', id)
+    setSpells(spells.filter(s => s.id !== id))
+  }
+
+  const byLevel = spells.reduce((acc, s) => { const l = s.spell_level; if (!acc[l]) acc[l] = []; acc[l].push(s); return acc }, {})
+  const levelLabel = (l) => l === 0 ? 'Trucchetti' : `Livello ${l}`
+
+  if (loading) return <p style={{ color: '#6b7280' }}>Caricamento...</p>
+
+  return (
+    <div>
+      {isOwner && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <BtnP onClick={() => setShowAddModal(true)}>+ Dal compendio</BtnP>
+          <BtnS onClick={() => setShowCustomModal(true)}>+ Personalizzato</BtnS>
+        </div>
+      )}
+
+      {spells.length === 0 && <p style={{ color: '#6b7280' }}>Nessun incantesimo ancora. {isOwner && 'Aggiungine uno!'}</p>}
+
+      {Object.keys(byLevel).sort((a, b) => parseInt(a) - parseInt(b)).map(level => (
+        <div key={level} style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.06em', marginBottom: 8, textTransform: 'uppercase' }}>{levelLabel(parseInt(level))}</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {byLevel[level].map(spell => (
+              <Card key={spell.id} style={{ padding: '0.75rem 1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                      <span style={{ fontWeight: 600, fontSize: 15, color: '#111827' }}>{spell.spell_name}</span>
+                      {spell.is_concentration && <Badge color="#D4537E">Conc.</Badge>}
+                      {spell.is_bonus_action && <Badge color="#BA7517">Azione bonus</Badge>}
+                      {spell.is_ritual && <Badge color="#7F77DD">Rituale</Badge>}
+                      {spell.is_custom && <Badge color="#888780">Custom</Badge>}
+                    </div>
+                    {spell.casting_time && <div style={{ fontSize: 12, color: '#9ca3af' }}>{spell.casting_time}</div>}
+                  </div>
+                  {isOwner && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button onClick={() => toggleField(spell, 'is_prepared')}
+                          style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${spell.is_prepared ? '#1D9E75' : '#d1d5db'}`, background: spell.is_prepared ? '#1D9E75' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {spell.is_prepared && <span style={{ color: 'white', fontSize: 14, lineHeight: 1 }}>✓</span>}
+                        </button>
+                        <span style={{ fontSize: 12, color: spell.is_prepared ? '#1D9E75' : '#9ca3af' }}>Preparato</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <button onClick={() => toggleField(spell, 'is_used')}
+                          style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${spell.is_used ? '#D85A30' : '#d1d5db'}`, background: spell.is_used ? '#D85A30' : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {spell.is_used && <span style={{ color: 'white', fontSize: 14, lineHeight: 1 }}>✓</span>}
+                        </button>
+                        <span style={{ fontSize: 12, color: spell.is_used ? '#D85A30' : '#9ca3af' }}>Usato</span>
+                      </div>
+                      <button onClick={() => removeSpell(spell.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 2, color: '#9ca3af', textAlign: 'right' }}>🗑️</button>
+                    </div>
+                  )}
+                  {!isOwner && (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      {spell.is_prepared && <Badge color="#1D9E75">Preparato</Badge>}
+                      {spell.is_used && <Badge color="#D85A30">Usato</Badge>}
+                    </div>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* Modal aggiungi dal compendio */}
+      {showAddModal && (
+        <Modal title="Aggiungi dal Compendio" onClose={() => { setShowAddModal(false); setSelectedSrd(null); setSrdSearch(''); setSrdSpells([]) }}>
+          <FF label="Cerca incantesimo">
+            <Input value={srdSearch} onChange={e => { setSrdSearch(e.target.value); searchSrd(e.target.value) }} placeholder="Digita il nome..." />
+          </FF>
+          {srdLoading && <p style={{ color: '#6b7280', fontSize: 14 }}>Ricerca...</p>}
+          {srdSpells.length > 0 && !selectedSrd && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, maxHeight: 300, overflowY: 'auto' }}>
+              {srdSpells.map(s => (
+                <button key={s.index} onClick={() => loadSrdDetail(s)}
+                  style={{ textAlign: 'left', padding: '10px 12px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#f9fafb', cursor: 'pointer', fontSize: 15, color: '#111827' }}>
+                  {s.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {selectedSrd && (
+            <Card style={{ marginBottom: 16, background: '#f0fdf4', border: '1px solid #86efac' }}>
+              <div style={{ fontWeight: 600, fontSize: 16, color: '#111827', marginBottom: 8 }}>{selectedSrd.name}</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                <Badge color="#378ADD">{selectedSrd.level === 0 ? 'Trucchetto' : `Lv ${selectedSrd.level}`}</Badge>
+                {selectedSrd.school && <Badge color={SCHOOL_COLORS[selectedSrd.school] || '#888'}>{selectedSrd.school}</Badge>}
+                {selectedSrd.concentration && <Badge color="#D4537E">Concentrazione</Badge>}
+                {selectedSrd.ritual && <Badge color="#BA7517">Rituale</Badge>}
+                {selectedSrd.isBonus && <Badge color="#BA7517">Azione bonus</Badge>}
+              </div>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: 0, lineHeight: 1.5 }}>{selectedSrd.description?.substring(0, 150)}...</p>
+              <button onClick={() => { setSelectedSrd(null); setSrdSpells([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#9ca3af', marginTop: 8 }}>← Cambia</button>
+            </Card>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <BtnS onClick={() => { setShowAddModal(false); setSelectedSrd(null) }}>Annulla</BtnS>
+            <BtnP onClick={addFromSrd} disabled={!selectedSrd}>Aggiungi</BtnP>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modal incantesimo custom */}
+      {showCustomModal && (
+        <Modal title="Incantesimo Personalizzato" onClose={() => setShowCustomModal(false)}>
+          <FF label="Nome"><Input value={customForm.spell_name} onChange={e => setCustomForm({ ...customForm, spell_name: e.target.value })} /></FF>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 12px' }}>
+            <FF label="Livello (0=trucchetto)"><Input type="number" min="0" max="9" value={customForm.spell_level} onChange={e => setCustomForm({ ...customForm, spell_level: parseInt(e.target.value) || 0 })} /></FF>
+            <FF label="Scuola"><Input value={customForm.school} onChange={e => setCustomForm({ ...customForm, school: e.target.value })} /></FF>
+          </div>
+          <FF label="Tempo di lancio"><Input value={customForm.casting_time} onChange={e => setCustomForm({ ...customForm, casting_time: e.target.value })} /></FF>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+            {[['is_concentration', 'Concentrazione'], ['is_bonus_action', 'Azione bonus'], ['is_ritual', 'Rituale']].map(([field, label]) => (
+              <label key={field} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, cursor: 'pointer', color: '#374151' }}>
+                <input type="checkbox" checked={customForm[field]} onChange={e => setCustomForm({ ...customForm, [field]: e.target.checked })} style={{ width: 18, height: 18 }} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <FF label="Descrizione"><Textarea value={customForm.description} onChange={e => setCustomForm({ ...customForm, description: e.target.value })} /></FF>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}><BtnS onClick={() => setShowCustomModal(false)}>Annulla</BtnS><BtnP onClick={addCustom}>Salva</BtnP></div>
+        </Modal>
+      )}
     </div>
   )
 }
 
 // ─── Scheda giocatore ─────────────────────────────────────────────────────────
-
 function PlayerTab({ player, currentUserId, isDM }) {
   const isOwner = isDM || currentUserId === player.id
   const [activeTab, setActiveTab] = useState('scheda')
@@ -719,13 +922,8 @@ function PlayerTab({ player, currentUserId, isDM }) {
   const openEditItem = (item) => { setEditingItem(item); setItemForm({ name: item.name, type: item.type, description: item.description || '', quantity: item.quantity }); setShowItemModal(true) }
   const saveItem = async () => {
     if (!itemForm.name) return
-    if (editingItem) {
-      const { data } = await supabase.from('inventory').update(itemForm).eq('id', editingItem.id).select()
-      if (data) setInventory(inventory.map(i => i.id === editingItem.id ? data[0] : i))
-    } else {
-      const { data } = await supabase.from('inventory').insert([{ ...itemForm, player_id: player.id }]).select()
-      if (data) setInventory([...inventory, data[0]])
-    }
+    if (editingItem) { const { data } = await supabase.from('inventory').update(itemForm).eq('id', editingItem.id).select(); if (data) setInventory(inventory.map(i => i.id === editingItem.id ? data[0] : i)) }
+    else { const { data } = await supabase.from('inventory').insert([{ ...itemForm, player_id: player.id }]).select(); if (data) setInventory([...inventory, data[0]]) }
     setShowItemModal(false)
   }
   const removeItem = async (id) => { await supabase.from('inventory').delete().eq('id', id); setInventory(inventory.filter(i => i.id !== id)) }
@@ -734,13 +932,8 @@ function PlayerTab({ player, currentUserId, isDM }) {
   const openEditComp = (c) => { setEditingComp(c); setCompForm({ name: c.name, type: c.type || '', hp: c.hp || '', ac: c.ac || '', notes: c.notes || '', image_path: c.image_path || '' }); setShowCompModal(true) }
   const saveComp = async () => {
     if (!compForm.name) return
-    if (editingComp) {
-      const { data } = await supabase.from('companions').update(compForm).eq('id', editingComp.id).select()
-      if (data) setCompanions(companions.map(c => c.id === editingComp.id ? data[0] : c))
-    } else {
-      const { data } = await supabase.from('companions').insert([{ ...compForm, player_id: player.id }]).select()
-      if (data) setCompanions([...companions, data[0]])
-    }
+    if (editingComp) { const { data } = await supabase.from('companions').update(compForm).eq('id', editingComp.id).select(); if (data) setCompanions(companions.map(c => c.id === editingComp.id ? data[0] : c)) }
+    else { const { data } = await supabase.from('companions').insert([{ ...compForm, player_id: player.id }]).select(); if (data) setCompanions([...companions, data[0]]) }
     setShowCompModal(false)
   }
   const removeComp = async (id) => { await supabase.from('companions').delete().eq('id', id); setCompanions(companions.filter(c => c.id !== id)) }
@@ -749,13 +942,8 @@ function PlayerTab({ player, currentUserId, isDM }) {
   const openEditNote = (n) => { setEditingNote(n); setNoteForm({ session_title: n.session_title, date: n.date || '', content: n.content || '' }); setShowNoteModal(true) }
   const saveNote = async () => {
     if (!noteForm.session_title) return
-    if (editingNote) {
-      const { data } = await supabase.from('player_session_notes').update(noteForm).eq('id', editingNote.id).select()
-      if (data) setSessionNotes(sessionNotes.map(n => n.id === editingNote.id ? data[0] : n))
-    } else {
-      const { data } = await supabase.from('player_session_notes').insert([{ ...noteForm, player_id: player.id }]).select()
-      if (data) setSessionNotes([data[0], ...sessionNotes])
-    }
+    if (editingNote) { const { data } = await supabase.from('player_session_notes').update(noteForm).eq('id', editingNote.id).select(); if (data) setSessionNotes(sessionNotes.map(n => n.id === editingNote.id ? data[0] : n)) }
+    else { const { data } = await supabase.from('player_session_notes').insert([{ ...noteForm, player_id: player.id }]).select(); if (data) setSessionNotes([data[0], ...sessionNotes]) }
     setShowNoteModal(false)
   }
   const removeNote = async (id) => { await supabase.from('player_session_notes').delete().eq('id', id); setSessionNotes(sessionNotes.filter(n => n.id !== id)) }
@@ -776,14 +964,13 @@ function PlayerTab({ player, currentUserId, isDM }) {
         {imgUrl ? <img src={imgUrl} alt="" style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${player.player_color || '#888'}`, flexShrink: 0 }} />
           : <div style={{ width: 56, height: 56, borderRadius: '50%', background: (player.player_color || '#888') + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 600, color: player.player_color || '#888', flexShrink: 0 }}>{player.username[0]}</div>}
         <div>
-          <div style={{ fontWeight: 600, fontSize: 17 }}>{character?.name || player.username}</div>
+          <div style={{ fontWeight: 600, fontSize: 17, color: '#111827' }}>{character?.name || player.username}</div>
           {character && <div style={{ fontSize: 14, color: '#6b7280' }}>{character.race} · {character.class} · Lv {character.level}</div>}
         </div>
       </div>
 
-      <Tabs tabs={['scheda', 'inventario', 'famigli', 'note sessione']} active={activeTab} onChange={setActiveTab} />
+      <Tabs tabs={['scheda', 'incantesimi', 'inventario', 'famigli', 'note sessione']} active={activeTab} onChange={setActiveTab} />
 
-      {/* SCHEDA */}
       {activeTab === 'scheda' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
@@ -806,44 +993,44 @@ function PlayerTab({ player, currentUserId, isDM }) {
                 <FF label="PF attuali"><Input type="number" value={charForm.hp} onChange={e => setCharForm({ ...charForm, hp: e.target.value })} /></FF>
                 <FF label="PF massimi"><Input type="number" value={charForm.max_hp} onChange={e => setCharForm({ ...charForm, max_hp: e.target.value })} /></FF>
               </div>
-              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Caratteristiche</p>
+              <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: '#374151' }}>Caratteristiche</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6, marginBottom: 16 }}>
                 {STATS.map(([l, k]) => <FF key={k} label={l}><Input type="number" value={charForm[k]} onChange={e => setCharForm({ ...charForm, [k]: e.target.value })} /></FF>)}
               </div>
-              <FF label="Attacchi (Nome | Bonus | Danni, uno per riga)"><Textarea value={charForm.attacks} onChange={e => setCharForm({ ...charForm, attacks: e.target.value })} placeholder={"Spada lunga | +5 | 1d8+3"} /></FF>
+              <FF label="Attacchi (Nome | Bonus | Danni, uno per riga)"><Textarea value={charForm.attacks} onChange={e => setCharForm({ ...charForm, attacks: e.target.value })} placeholder="Spada lunga | +5 | 1d8+3" /></FF>
               <FF label="Slot totali (es. 4,3,2)"><Input value={charForm.spell_slots_total} onChange={e => setCharForm({ ...charForm, spell_slots_total: e.target.value })} placeholder="4,3,2" /></FF>
               <FF label="Slot usati (es. 2,1,0)"><Input value={charForm.spell_slots_used} onChange={e => setCharForm({ ...charForm, spell_slots_used: e.target.value })} placeholder="2,1,0" /></FF>
             </Card>
           ) : character ? (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 12 }}>
-                {[['CA', character.ac], ['Livello', character.level], ['Background', character.background]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 8px', textAlign: 'center' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{k}</div><div style={{ fontSize: 16, fontWeight: 600 }}>{v}</div></div>)}
+                {[['CA', character.ac], ['Livello', character.level], ['Background', character.background]].map(([k, v]) => <div key={k} style={{ background: '#f9fafb', borderRadius: 8, padding: '10px 8px', textAlign: 'center' }}><div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{k}</div><div style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>{v}</div></div>)}
               </div>
               <Card style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontSize: 14, color: '#6b7280' }}>Punti Ferita</span><span style={{ fontSize: 15, fontWeight: 600 }}>{character.hp} / {character.max_hp}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontSize: 14, color: '#6b7280' }}>Punti Ferita</span><span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>{character.hp} / {character.max_hp}</span></div>
                 <div style={{ height: 10, background: '#f3f4f6', borderRadius: 5, overflow: 'hidden' }}><div style={{ height: '100%', width: `${hpPct}%`, background: hpColor, borderRadius: 5, transition: 'width 0.3s' }} /></div>
               </Card>
               <Card style={{ marginBottom: 12 }}>
-                <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 10px' }}>Caratteristiche</p>
+                <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 10px', color: '#374151' }}>Caratteristiche</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6 }}>
-                  {STATS.map(([l, k]) => <div key={k} style={{ textAlign: 'center', background: '#f9fafb', borderRadius: 8, padding: '8px 2px' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 700 }}>{character[k] || 10}</div><div style={{ fontSize: 12, color: '#6b7280' }}>{mod(character[k])}</div></div>)}
+                  {STATS.map(([l, k]) => <div key={k} style={{ textAlign: 'center', background: '#f9fafb', borderRadius: 8, padding: '8px 2px' }}><div style={{ fontSize: 10, color: '#9ca3af', marginBottom: 2 }}>{l}</div><div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{character[k] || 10}</div><div style={{ fontSize: 12, color: '#6b7280' }}>{mod(character[k])}</div></div>)}
                 </div>
               </Card>
               {character.attacks && (
                 <Card style={{ marginBottom: 12 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Attacchi</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px', color: '#374151' }}>Attacchi</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '6px 12px', fontSize: 14 }}>
                     {['NOME', 'BONUS', 'DANNI'].map(h => <span key={h} style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>{h}</span>)}
                     {character.attacks.split('\n').filter(Boolean).map((atk, i) => {
                       const [nome, bonus, danni] = atk.split('|').map(s => s.trim())
-                      return [<span key={`n${i}`} style={{ fontWeight: 500 }}>{nome}</span>, <span key={`b${i}`} style={{ color: '#1D9E75', fontWeight: 600 }}>{bonus}</span>, <span key={`d${i}`} style={{ color: '#D85A30' }}>{danni}</span>]
+                      return [<span key={`n${i}`} style={{ fontWeight: 500, color: '#111827' }}>{nome}</span>, <span key={`b${i}`} style={{ color: '#1D9E75', fontWeight: 600 }}>{bonus}</span>, <span key={`d${i}`} style={{ color: '#D85A30' }}>{danni}</span>]
                     })}
                   </div>
                 </Card>
               )}
               {slotsT.length > 0 && (
                 <Card style={{ marginBottom: 12 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 10px' }}>Slot Incantesimo</p>
+                  <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 10px', color: '#374151' }}>Slot Incantesimo</p>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {slotsT.map((total, i) => {
                       const rem = total - (slotsU[i] || 0)
@@ -865,7 +1052,10 @@ function PlayerTab({ player, currentUserId, isDM }) {
         </div>
       )}
 
-      {/* INVENTARIO */}
+      {activeTab === 'incantesimi' && (
+        <SpellbookTab playerId={player.id} isOwner={isOwner} />
+      )}
+
       {activeTab === 'inventario' && (
         <div>
           <CoinsPanel values={character || charForm} onChange={handleCoin} editable={isOwner} />
@@ -875,7 +1065,7 @@ function PlayerTab({ player, currentUserId, isDM }) {
             {inventory.map(item => (
               <Card key={item.id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                  <div style={{ flex: 1 }}><span style={{ fontWeight: 600, fontSize: 15 }}>{item.name}</span>{item.quantity > 1 && <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 6 }}>×{item.quantity}</span>}</div>
+                  <div style={{ flex: 1 }}><span style={{ fontWeight: 600, fontSize: 15, color: '#111827' }}>{item.name}</span>{item.quantity > 1 && <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 6 }}>×{item.quantity}</span>}</div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                     <Badge color={ITEM_TYPE_COLORS[item.type] || '#888'}>{item.type}</Badge>
                     {isOwner && <><button onClick={() => openEditItem(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button><button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>🗑️</button></>}
@@ -897,7 +1087,6 @@ function PlayerTab({ player, currentUserId, isDM }) {
         </div>
       )}
 
-      {/* FAMIGLI */}
       {activeTab === 'famigli' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>{isOwner && <BtnP onClick={openAddComp}>+ Aggiungi</BtnP>}</div>
@@ -910,11 +1099,11 @@ function PlayerTab({ player, currentUserId, isDM }) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     {cImg ? <img src={cImg} alt={c.name} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                       : <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>🐾</div>}
-                    <div><div style={{ fontWeight: 600 }}>{c.name}</div><div style={{ fontSize: 13, color: '#9ca3af' }}>{c.type}</div></div>
+                    <div><div style={{ fontWeight: 600, color: '#111827' }}>{c.name}</div><div style={{ fontSize: 13, color: '#9ca3af' }}>{c.type}</div></div>
                   </div>
                   {isOwner && <div style={{ display: 'flex', gap: 4 }}><button onClick={() => openEditComp(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button><button onClick={() => removeComp(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>🗑️</button></div>}
                 </div>
-                <div style={{ display: 'flex', gap: 16, marginTop: 10 }}><span style={{ fontSize: 14 }}><span style={{ color: '#9ca3af' }}>PF </span>{c.hp}</span><span style={{ fontSize: 14 }}><span style={{ color: '#9ca3af' }}>CA </span>{c.ac}</span></div>
+                <div style={{ display: 'flex', gap: 16, marginTop: 10 }}><span style={{ fontSize: 14, color: '#374151' }}><span style={{ color: '#9ca3af' }}>PF </span>{c.hp}</span><span style={{ fontSize: 14, color: '#374151' }}><span style={{ color: '#9ca3af' }}>CA </span>{c.ac}</span></div>
                 {c.notes && <p style={{ margin: '8px 0 0', fontSize: 14, color: '#6b7280' }}>{c.notes}</p>}
               </Card>
             )
@@ -935,11 +1124,10 @@ function PlayerTab({ player, currentUserId, isDM }) {
         </div>
       )}
 
-      {/* NOTE SESSIONE */}
       {activeTab === 'note sessione' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <span style={{ fontWeight: 600, fontSize: 16 }}>Note di sessione</span>
+            <span style={{ fontWeight: 600, fontSize: 16, color: '#111827' }}>Note di sessione</span>
             {isOwner && <BtnP onClick={openAddNote}>+ Nuova nota</BtnP>}
           </div>
           <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 16 }}>Visibili solo a te e al DM.</p>
@@ -947,20 +1135,18 @@ function PlayerTab({ player, currentUserId, isDM }) {
           {sessionNotes.map(n => (
             <Card key={n.id} style={{ marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedNote(expandedNote === n.id ? null : n.id)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <span style={{ fontWeight: 600, fontSize: 15 }}>{n.session_title}</span>
-                  {n.date && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{n.date}</span>}
-                </div>
+                <div><span style={{ fontWeight: 600, fontSize: 15, color: '#111827' }}>{n.session_title}</span>{n.date && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{n.date}</span>}</div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   {isOwner && <><button onClick={e => { e.stopPropagation(); openEditNote(n) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button><button onClick={e => { e.stopPropagation(); removeNote(n.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>🗑️</button></>}
                   <span style={{ color: '#9ca3af' }}>{expandedNote === n.id ? '▲' : '▼'}</span>
                 </div>
               </div>
-              {expandedNote === n.id && <pre style={{ margin: '12px 0 0', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.7, color: '#6b7280', whiteSpace: 'pre-wrap', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>{n.content}</pre>}
+              {expandedNote === n.id && <pre style={{ margin: '12px 0 0', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-wrap', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>{n.content}</pre>}
             </Card>
           ))}
           {showNoteModal && (
             <Modal title={editingNote ? 'Modifica Nota' : 'Nuova Nota di Sessione'} onClose={() => setShowNoteModal(false)}>
+              <NotePhotoScanner onTranscribed={text => setNoteForm(f => ({ ...f, content: f.content ? f.content + '\n\n' + text : text }))} />
               <FF label="Titolo / Sessione"><Input value={noteForm.session_title} onChange={e => setNoteForm({ ...noteForm, session_title: e.target.value })} placeholder="es. Sessione 3 — La cripta" /></FF>
               <FF label="Data"><Input type="date" value={noteForm.date} onChange={e => setNoteForm({ ...noteForm, date: e.target.value })} /></FF>
               <FF label="Note"><Textarea value={noteForm.content} onChange={e => setNoteForm({ ...noteForm, content: e.target.value })} style={{ minHeight: 160 }} /></FF>
@@ -973,8 +1159,7 @@ function PlayerTab({ player, currentUserId, isDM }) {
   )
 }
 
-// ─── Party (loot + quest + note gruppo) ───────────────────────────────────────
-
+// ─── Party ────────────────────────────────────────────────────────────────────
 function SharedSection() {
   const [loot, setLoot] = useState([])
   const [quests, setQuests] = useState([])
@@ -1021,13 +1206,8 @@ function SharedSection() {
   const openEditLoot = (item) => { setEditingLoot(item); setLootForm({ name: item.name, quantity: item.quantity, notes: item.notes || '' }); setShowLootModal(true) }
   const saveLoot = async () => {
     if (!lootForm.name) return
-    if (editingLoot) {
-      const { data } = await supabase.from('party_loot').update(lootForm).eq('id', editingLoot.id).select()
-      if (data) setLoot(loot.map(l => l.id === editingLoot.id ? data[0] : l))
-    } else {
-      const { data } = await supabase.from('party_loot').insert([lootForm]).select()
-      if (data) setLoot([...loot, data[0]])
-    }
+    if (editingLoot) { const { data } = await supabase.from('party_loot').update(lootForm).eq('id', editingLoot.id).select(); if (data) setLoot(loot.map(l => l.id === editingLoot.id ? data[0] : l)) }
+    else { const { data } = await supabase.from('party_loot').insert([lootForm]).select(); if (data) setLoot([...loot, data[0]]) }
     setShowLootModal(false)
   }
   const removeLoot = async (id) => { await supabase.from('party_loot').delete().eq('id', id); setLoot(loot.filter(l => l.id !== id)) }
@@ -1036,13 +1216,8 @@ function SharedSection() {
   const openEditQuest = (q) => { setEditingQuest(q); setQuestForm({ title: q.title, description: q.description || '', status: q.status, reward: q.reward || '' }); setShowQuestModal(true) }
   const saveQuest = async () => {
     if (!questForm.title) return
-    if (editingQuest) {
-      const { data } = await supabase.from('quests').update(questForm).eq('id', editingQuest.id).select()
-      if (data) setQuests(quests.map(q => q.id === editingQuest.id ? data[0] : q))
-    } else {
-      const { data } = await supabase.from('quests').insert([questForm]).select()
-      if (data) setQuests([...quests, data[0]])
-    }
+    if (editingQuest) { const { data } = await supabase.from('quests').update(questForm).eq('id', editingQuest.id).select(); if (data) setQuests(quests.map(q => q.id === editingQuest.id ? data[0] : q)) }
+    else { const { data } = await supabase.from('quests').insert([questForm]).select(); if (data) setQuests([...quests, data[0]]) }
     setShowQuestModal(false)
   }
   const removeQuest = async (id) => { await supabase.from('quests').delete().eq('id', id); setQuests(quests.filter(q => q.id !== id)) }
@@ -1051,13 +1226,8 @@ function SharedSection() {
   const openEditGNote = (n) => { setEditingGNote(n); setGnoteForm({ session_title: n.session_title, date: n.date || '', content: n.content || '' }); setShowNoteModal(true) }
   const saveGNote = async () => {
     if (!gnoteForm.session_title) return
-    if (editingGNote) {
-      const { data } = await supabase.from('group_notes').update(gnoteForm).eq('id', editingGNote.id).select()
-      if (data) setGroupNotes(groupNotes.map(n => n.id === editingGNote.id ? data[0] : n))
-    } else {
-      const { data } = await supabase.from('group_notes').insert([gnoteForm]).select()
-      if (data) setGroupNotes([data[0], ...groupNotes])
-    }
+    if (editingGNote) { const { data } = await supabase.from('group_notes').update(gnoteForm).eq('id', editingGNote.id).select(); if (data) setGroupNotes(groupNotes.map(n => n.id === editingGNote.id ? data[0] : n)) }
+    else { const { data } = await supabase.from('group_notes').insert([gnoteForm]).select(); if (data) setGroupNotes([data[0], ...groupNotes]) }
     setShowNoteModal(false)
   }
   const removeGNote = async (id) => { await supabase.from('group_notes').delete().eq('id', id); setGroupNotes(groupNotes.filter(n => n.id !== id)) }
@@ -1066,15 +1236,14 @@ function SharedSection() {
   return (
     <div>
       <Tabs tabs={['loot', 'quest', 'note gruppo']} active={activeTab} onChange={setActiveTab} />
-
       {activeTab === 'loot' && (
         <div>
           <CoinsPanel values={partyCoins} onChange={(k, v) => savePartyCoins({ ...partyCoins, [k]: v })} editable={true} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 600, fontSize: 18 }}>Oggetti del Gruppo</span><BtnP onClick={openAddLoot}>+ Aggiungi</BtnP></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 600, fontSize: 18, color: '#111827' }}>Oggetti del Gruppo</span><BtnP onClick={openAddLoot}>+ Aggiungi</BtnP></div>
           {loot.length === 0 && <p style={{ color: '#6b7280' }}>Nessun oggetto ancora.</p>}
           {loot.map(item => (
             <Card key={item.id} style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <div style={{ flex: 1 }}><span style={{ fontWeight: 600 }}>{item.name}</span>{item.notes && <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 8 }}>{item.notes}</span>}</div>
+              <div style={{ flex: 1 }}><span style={{ fontWeight: 600, color: '#111827' }}>{item.name}</span>{item.notes && <span style={{ fontSize: 13, color: '#9ca3af', marginLeft: 8 }}>{item.notes}</span>}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                 <span style={{ fontWeight: 600, color: '#BA7517' }}>×{item.quantity}</span>
                 <button onClick={() => openEditLoot(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button>
@@ -1092,15 +1261,14 @@ function SharedSection() {
           )}
         </div>
       )}
-
       {activeTab === 'quest' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 600, fontSize: 18 }}>Quest</span><BtnP onClick={openAddQuest}>+ Nuova</BtnP></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 600, fontSize: 18, color: '#111827' }}>Quest</span><BtnP onClick={openAddQuest}>+ Nuova</BtnP></div>
           {quests.length === 0 && <p style={{ color: '#6b7280' }}>Nessuna quest ancora.</p>}
           {quests.map(q => (
             <Card key={q.id} style={{ marginBottom: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <span style={{ fontWeight: 600, flex: 1 }}>{q.title}</span>
+                <span style={{ fontWeight: 600, flex: 1, color: '#111827' }}>{q.title}</span>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                   <Badge color={QUEST_STATUS_COLORS[q.status] || '#888'}>{q.status}</Badge>
                   <button onClick={() => openEditQuest(q)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button>
@@ -1122,11 +1290,10 @@ function SharedSection() {
           )}
         </div>
       )}
-
       {activeTab === 'note gruppo' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ fontWeight: 600, fontSize: 18 }}>Note di Gruppo</span>
+            <span style={{ fontWeight: 600, fontSize: 18, color: '#111827' }}>Note di Gruppo</span>
             <BtnP onClick={openAddGNote}>+ Nuova nota</BtnP>
           </div>
           <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 16 }}>Visibili e modificabili da tutti.</p>
@@ -1134,21 +1301,19 @@ function SharedSection() {
           {groupNotes.map(n => (
             <Card key={n.id} style={{ marginBottom: 10, cursor: 'pointer' }} onClick={() => setExpandedNote(expandedNote === n.id ? null : n.id)}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
-                  <span style={{ fontWeight: 600, fontSize: 15 }}>{n.session_title}</span>
-                  {n.date && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{n.date}</span>}
-                </div>
+                <div><span style={{ fontWeight: 600, fontSize: 15, color: '#111827' }}>{n.session_title}</span>{n.date && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{n.date}</span>}</div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   <button onClick={e => { e.stopPropagation(); openEditGNote(n) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>✏️</button>
                   <button onClick={e => { e.stopPropagation(); removeGNote(n.id) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 4 }}>🗑️</button>
                   <span style={{ color: '#9ca3af' }}>{expandedNote === n.id ? '▲' : '▼'}</span>
                 </div>
               </div>
-              {expandedNote === n.id && <pre style={{ margin: '12px 0 0', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.7, color: '#6b7280', whiteSpace: 'pre-wrap', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>{n.content}</pre>}
+              {expandedNote === n.id && <pre style={{ margin: '12px 0 0', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.7, color: '#374151', whiteSpace: 'pre-wrap', borderTop: '1px solid #f3f4f6', paddingTop: 12 }}>{n.content}</pre>}
             </Card>
           ))}
           {showNoteModal && (
             <Modal title={editingGNote ? 'Modifica Nota' : 'Nuova Nota di Gruppo'} onClose={() => setShowNoteModal(false)}>
+              <NotePhotoScanner onTranscribed={text => setGnoteForm(f => ({ ...f, content: f.content ? f.content + '\n\n' + text : text }))} />
               <FF label="Titolo / Sessione"><Input value={gnoteForm.session_title} onChange={e => setGnoteForm({ ...gnoteForm, session_title: e.target.value })} placeholder="es. Sessione 3 — La cripta" /></FF>
               <FF label="Data"><Input type="date" value={gnoteForm.date} onChange={e => setGnoteForm({ ...gnoteForm, date: e.target.value })} /></FF>
               <FF label="Note"><Textarea value={gnoteForm.content} onChange={e => setGnoteForm({ ...gnoteForm, content: e.target.value })} style={{ minHeight: 160 }} /></FF>
@@ -1162,7 +1327,6 @@ function SharedSection() {
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-
 function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM }) {
   const DM_SECTIONS = [
     { id: 'sessioni', label: 'Sessioni', icon: '📖' },
@@ -1177,7 +1341,6 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
   const playerSections = isDM ? players : players.filter(p => p.id === profile?.id)
 
   const handleNav = (id) => { setActiveSection(id); onClose() }
-
   const btnStyle = (id) => ({
     display: 'flex', alignItems: 'center', gap: 10, width: '100%',
     padding: '10px 12px', borderRadius: 10, border: 'none',
@@ -1192,7 +1355,7 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
       <div style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: 260, background: '#fff', borderRight: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', zIndex: 300, transform: isOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: isOpen ? '4px 0 20px rgba(0,0,0,0.15)' : 'none', overflowY: 'auto' }}>
         <div style={{ padding: '1.25rem 1rem 0.75rem', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ fontSize: 22 }}>🐗</span> Campaign Hub</div>
+            <div style={{ fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', gap: 6, color: '#111827' }}><span style={{ fontSize: 22 }}>🐗</span> D&Cinghiali</div>
             <div style={{ fontSize: 13, color: '#9ca3af', marginTop: 2 }}>{profile?.username} · {isDM ? 'DM' : 'Giocatore'}</div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#9ca3af', padding: 4 }}>×</button>
@@ -1216,7 +1379,6 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
-
 export default function Campaign({ profile, onLogout }) {
   const [players, setPlayers] = useState([])
   const [activeSection, setActiveSection] = useState('sessioni')
@@ -1248,7 +1410,7 @@ export default function Campaign({ profile, onLogout }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f9fafb', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f9fafb', fontFamily: 'system-ui, sans-serif', color: '#111827' }}>
       <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 1rem', height: 56, display: 'flex', alignItems: 'center', gap: 12 }}>
         <button onClick={() => setSidebarOpen(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 8, borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 40, minHeight: 40, justifyContent: 'center', alignItems: 'center' }}>
           <span style={{ display: 'block', width: 22, height: 2, background: '#374151', borderRadius: 2 }} />
@@ -1256,7 +1418,7 @@ export default function Campaign({ profile, onLogout }) {
           <span style={{ display: 'block', width: 22, height: 2, background: '#374151', borderRadius: 2 }} />
         </button>
         <span style={{ fontSize: 20 }}>🐗</span>
-        <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{currentLabel}</span>
+        <span style={{ fontWeight: 600, fontSize: 15, flex: 1, color: '#111827' }}>{currentLabel}</span>
         <span style={{ fontSize: 13, color: '#9ca3af' }}>{profile?.username}</span>
       </div>
       <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSection} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} />
