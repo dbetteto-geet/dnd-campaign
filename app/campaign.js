@@ -13,6 +13,7 @@ const EVENT_COLORS = { scoperta: T.purple, incontro: T.green, combattimento: T.r
 const STATUS_COLORS = { visitato: T.green, noto: T.blue, sconosciuto: T.inkFaint, pericoloso: T.red }
 const QUEST_STATUS_COLORS = { attiva: T.green, completata: T.inkFaint, fallita: T.red, in_sospeso: T.gold }
 const ITEM_TYPE_COLORS = { 'Arma magica': T.purple, Consumabile: T.green, Armatura: T.blue, Vari: T.inkFaint, Arma: T.red }
+const VITALITY_COLORS = { vivo: '#1a5c2e', morto: '#8b1a1a', sconosciuto: '#8b6355' }
 const SCHOOL_COLORS = { Evocazione: T.red, Illusione: T.purple, Necromanzia: T.inkFaint, Trasformazione: T.green, Divinazione: T.blue, Ammaliamento: '#7a1a4a', Abiurazione: T.gold, Invocazione: '#1a4a3c' }
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -424,6 +425,54 @@ function SessionsSection({ isDM }) {
   )
 }
 
+// ─── NPC Grouped ─────────────────────────────────────────────────────────────
+function NPCCard({ npc, onSelect }) {
+  const img = getPublicUrl('npc-images', npc.image_path)
+  return (
+    <Card onClick={() => onSelect(npc)}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        {img ? <img src={img} alt={npc.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', objectPosition: 'center', border: `2px solid ${T.gold}`, flexShrink: 0 }} />
+          : <div style={{ width: 48, height: 48, borderRadius: '50%', background: (ATTITUDE_COLORS[npc.attitude] || T.inkFaint) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 600, color: ATTITUDE_COLORS[npc.attitude] || T.inkFaint, border: `2px solid ${T.parchmentDarker}`, flexShrink: 0, ...headerFont }}>{npc.name[0]}</div>}
+        <div>
+          <div style={{ fontWeight: 600, color: T.ink, fontSize: 16, ...headerFont }}>{npc.name}</div>
+          <div style={{ fontSize: 13, color: T.inkFaint, fontStyle: 'italic' }}>{npc.role}</div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+        <Badge color={ATTITUDE_COLORS[npc.attitude] || T.inkFaint}>{npc.attitude}</Badge>
+        <Badge color={VITALITY_COLORS[npc.vitality] || T.inkFaint}>{npc.vitality || 'vivo'}</Badge>
+        {npc.faction && <Badge color={T.gold}>{npc.faction}</Badge>}
+      </div>
+      <p style={{ fontSize: 14, color: T.inkLight, marginTop: 4, marginBottom: 0, lineHeight: 1.5 }}>{npc.description?.substring(0, 100)}{npc.description?.length > 100 ? '...' : ''}</p>
+    </Card>
+  )
+}
+
+function NPCGrouped({ npcs, onSelect }) {
+  const [collapsed, setCollapsed] = useState({})
+  const toggle = (k) => setCollapsed(c => ({ ...c, [k]: !c[k] }))
+  const groups = {}
+  npcs.forEach(npc => { const k = npc.faction || '— Nessuna fazione —'; if (!groups[k]) groups[k] = []; groups[k].push(npc) })
+  const keys = Object.keys(groups).sort((a, b) => { if (a === '— Nessuna fazione —') return 1; if (b === '— Nessuna fazione —') return -1; return a.localeCompare(b) })
+  return (
+    <div>
+      {keys.map(k => (
+        <div key={k} style={{ marginBottom: 16 }}>
+          <button onClick={() => toggle(k)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'transparent', border: 'none', cursor: 'pointer', padding: '6px 0', marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: k === '— Nessuna fazione —' ? T.inkFaint : T.gold, letterSpacing: '0.08em', textTransform: 'uppercase', ...headerFont }}>{k}</span>
+              <span style={{ fontSize: 12, color: T.inkFaint }}>({groups[k].length})</span>
+            </div>
+            <span style={{ color: T.gold, fontSize: 12 }}>{collapsed[k] ? '▶' : '▼'}</span>
+          </button>
+          {!collapsed[k] && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%,240px),1fr))', gap: 12 }}>{groups[k].map(npc => <NPCCard key={npc.id} npc={npc} onSelect={onSelect} />)}</div>}
+          <div style={{ height: 1, background: `linear-gradient(to right, ${T.gold}44, transparent)`, marginTop: 8 }} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── NPC ──────────────────────────────────────────────────────────────────────
 function NPCSection({ isDM }) {
   const [npcs, setNpcs] = useState([])
@@ -432,13 +481,13 @@ function NPCSection({ isDM }) {
   const [editing, setEditing] = useState(null)
   const [search, setSearch] = useState('')
   const [filterAttitude, setFilterAttitude] = useState('')
-  const [form, setForm] = useState({ name: '', role: '', attitude: 'Neutrale', description: '', notes_dm: '', image_path: '' })
+  const [form, setForm] = useState({ name: '', role: '', attitude: 'Neutrale', description: '', notes_dm: '', image_path: '', vitality: 'vivo', first_location: '', current_location: '', faction: '' })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { supabase.from('npcs').select('*').order('name').then(({ data }) => { setNpcs(data || []); setLoading(false) }) }, [])
 
   const openAdd = () => { setEditing(null); setForm({ name: '', role: '', attitude: 'Neutrale', description: '', notes_dm: '', image_path: '' }); setShowModal(true) }
-  const openEdit = (e, npc) => { e && e.stopPropagation(); setEditing(npc); setForm({ name: npc.name, role: npc.role || '', attitude: npc.attitude, description: npc.description || '', notes_dm: npc.notes_dm || '', image_path: npc.image_path || '' }); setShowModal(true) }
+  const openEdit = (e, npc) => { e && e.stopPropagation(); setEditing(npc); setForm({ name: npc.name, role: npc.role || '', attitude: npc.attitude, description: npc.description || '', notes_dm: npc.notes_dm || '', image_path: npc.image_path || '', vitality: npc.vitality || 'vivo', first_location: npc.first_location || '', current_location: npc.current_location || '', faction: npc.faction || '' }); setShowModal(true) }
   const save = async () => {
     if (!form.name) return
     if (editing) { const { data } = await supabase.from('npcs').update(form).eq('id', editing.id).select(); if (data) { setNpcs(npcs.map(n => n.id === editing.id ? data[0] : n)); if (selected?.id === editing.id) setSelected(data[0]) } }
@@ -456,7 +505,7 @@ function NPCSection({ isDM }) {
   if (loading) return <p style={{ color: T.inkFaint }}>Caricamento...</p>
   return (
     <div>
-      <SH title="🧑‍🤝‍🧑 Personaggi" action={isDM && <BtnP onClick={openAdd}>+ Aggiungi</BtnP>} />
+      <SH title="⚔ NPC" action={isDM && <BtnP onClick={openAdd}>+ Aggiungi</BtnP>} />
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 160 }}><Input placeholder="Cerca personaggio..." value={search} onChange={e => setSearch(e.target.value)} /></div>
         <Sel value={filterAttitude} onChange={e => setFilterAttitude(e.target.value)} style={{ width: 'auto', minWidth: 140 }}>
@@ -465,29 +514,13 @@ function NPCSection({ isDM }) {
         </Sel>
       </div>
       <p style={{ fontSize: 13, color: T.inkFaint, marginBottom: 12, fontStyle: 'italic' }}>{filtered.length} personaggi{filterAttitude ? ` (${filterAttitude})` : ''}</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%,240px),1fr))', gap: 12 }}>
-        {filtered.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessun personaggio trovato.</p>}
-        {filtered.map(npc => {
-          const img = getPublicUrl('npc-images', npc.image_path)
-          return (
-            <Card key={npc.id} onClick={() => setSelected(npc)}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                {img ? <img src={img} alt={npc.name} style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', border: `2px solid ${T.gold}`, flexShrink: 0 }} />
-                  : <div style={{ width: 48, height: 48, borderRadius: '50%', background: (ATTITUDE_COLORS[npc.attitude] || T.inkFaint) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 600, color: ATTITUDE_COLORS[npc.attitude] || T.inkFaint, border: `2px solid ${T.parchmentDarker}`, flexShrink: 0, ...headerFont }}>{npc.name[0]}</div>}
-                <div><div style={{ fontWeight: 600, color: T.ink, fontSize: 16, ...headerFont }}>{npc.name}</div><div style={{ fontSize: 13, color: T.inkFaint, fontStyle: 'italic' }}>{npc.role}</div></div>
-              </div>
-              <Badge color={ATTITUDE_COLORS[npc.attitude] || T.inkFaint}>{npc.attitude}</Badge>
-              <p style={{ fontSize: 14, color: T.inkLight, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>{npc.description?.substring(0, 120)}{npc.description?.length > 120 ? '...' : ''}</p>
-            </Card>
-          )
-        })}
-      </div>
+      <NPCGrouped npcs={filtered} onSelect={setSelected} />
       {selected && (() => {
         const img = getPublicUrl('npc-images', selected.image_path)
         return (
           <Modal title={selected.name} onClose={() => setSelected(null)}>
             {img && <img src={img} alt={selected.name} style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 6, marginBottom: 12, border: `2px solid ${T.gold}` }} />}
-            <div style={{ marginBottom: 8 }}><Badge color={ATTITUDE_COLORS[selected.attitude] || T.inkFaint}>{selected.attitude}</Badge><span style={{ fontSize: 14, color: T.inkFaint, marginLeft: 8, fontStyle: 'italic' }}>{selected.role}</span></div>
+            <div style={{ marginBottom: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}><Badge color={ATTITUDE_COLORS[selected.attitude] || T.inkFaint}>{selected.attitude}</Badge><Badge color={VITALITY_COLORS[selected.vitality] || T.inkFaint}>{selected.vitality || 'vivo'}</Badge>{selected.faction && <Badge color={T.gold}>{selected.faction}</Badge>}<span style={{ fontSize: 14, color: T.inkFaint, fontStyle: 'italic' }}>{selected.role}</span></div>{(selected.first_location || selected.current_location) && <div style={{ display: 'flex', gap: 16, marginBottom: 12, flexWrap: 'wrap' }}>{selected.first_location && <div style={{ fontSize: 13, color: T.inkFaint }}><span style={{ color: T.inkLight, fontWeight: 600 }}>Primo incontro: </span>{selected.first_location}</div>}{selected.current_location && <div style={{ fontSize: 13, color: T.inkFaint }}><span style={{ color: T.inkLight, fontWeight: 600 }}>Posizione: </span>{selected.current_location}</div>}</div>}
             <p style={{ fontSize: 16, lineHeight: 1.7, color: T.inkLight }}>{selected.description}</p>
             {isDM && selected.notes_dm && <><Divider /><div style={{ background: '#fff8e8', border: `1px solid ${T.goldLight}`, borderRadius: 4, padding: '0.75rem 1rem' }}><span style={{ fontSize: 12, fontWeight: 600, color: T.gold, display: 'block', marginBottom: 4, ...headerFont, letterSpacing: '0.05em' }}>NOTE DM</span><span style={{ fontSize: 14, color: T.inkLight }}>{selected.notes_dm}</span></div></>}
             {isDM && <div style={{ display: 'flex', gap: 8, marginTop: 16 }}><BtnS onClick={() => openEdit(null, selected)}>✏️ Modifica</BtnS><BtnD onClick={() => remove(selected.id)}>🗑️ Elimina</BtnD></div>}
@@ -502,7 +535,156 @@ function NPCSection({ isDM }) {
           <FF label="Attitudine"><Sel value={form.attitude} onChange={e => setForm({ ...form, attitude: e.target.value })}>{Object.keys(ATTITUDE_COLORS).map(a => <option key={a}>{a}</option>)}</Sel></FF>
           <FF label="Descrizione"><Textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} /></FF>
           <FF label="Note DM (segrete)"><Textarea value={form.notes_dm} onChange={e => setForm({ ...form, notes_dm: e.target.value })} /></FF>
+          <FF label="Stato"><Sel value={form.vitality} onChange={e => setForm({ ...form, vitality: e.target.value })}><option value="vivo">Vivo</option><option value="morto">Morto</option><option value="sconosciuto">Sconosciuto</option></Sel></FF>
+          <FF label="Fazione"><Input value={form.faction || ''} onChange={e => setForm({ ...form, faction: e.target.value })} placeholder="es. Gilda dei Mercanti" /></FF>
+          <FF label="Luogo primo incontro"><Input value={form.first_location || ''} onChange={e => setForm({ ...form, first_location: e.target.value })} placeholder="es. Taverna del Corvo" /></FF>
+          <FF label="Posizione attuale"><Input value={form.current_location || ''} onChange={e => setForm({ ...form, current_location: e.target.value })} placeholder="es. Castello di Nordveil" /></FF>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowModal(false)}>Annulla</BtnS><BtnP onClick={save}>Salva</BtnP></div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
+// ─── Fazioni ─────────────────────────────────────────────────────────────────
+function FactionsSection({ isDM }) {
+  const [factions, setFactions] = useState([])
+  const [sections, setSections] = useState({})
+  const [collapsed, setCollapsed] = useState({})
+  const [collapsedSections, setCollapsedSections] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [showFactionModal, setShowFactionModal] = useState(false)
+  const [editingFaction, setEditingFaction] = useState(null)
+  const [factionForm, setFactionForm] = useState({ name: '', description: '' })
+  const [showSectionModal, setShowSectionModal] = useState(false)
+  const [editingSection, setEditingSection] = useState(null)
+  const [activeFactionId, setActiveFactionId] = useState(null)
+  const [sectionForm, setSectionForm] = useState({ title: '', content: '' })
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('factions').select('*').order('order_index'),
+      supabase.from('faction_sections').select('*').order('order_index'),
+    ]).then(([f, s]) => {
+      const facs = f.data || []
+      setFactions(facs)
+      const grouped = {}
+      facs.forEach(fac => { grouped[fac.id] = (s.data || []).filter(sec => sec.faction_id === fac.id) })
+      setSections(grouped)
+      setLoading(false)
+    })
+  }, [])
+
+  const toggleFaction = (id) => setCollapsed(c => ({ ...c, [id]: !c[id] }))
+  const toggleSection = (id) => setCollapsedSections(c => ({ ...c, [id]: !c[id] }))
+
+  const openAddFaction = () => { setEditingFaction(null); setFactionForm({ name: '', description: '' }); setShowFactionModal(true) }
+  const openEditFaction = (f) => { setEditingFaction(f); setFactionForm({ name: f.name, description: f.description || '' }); setShowFactionModal(true) }
+  const saveFaction = async () => {
+    if (!factionForm.name) return
+    if (editingFaction) {
+      const { data } = await supabase.from('factions').update(factionForm).eq('id', editingFaction.id).select()
+      if (data) setFactions(factions.map(f => f.id === editingFaction.id ? data[0] : f))
+    } else {
+      const { data } = await supabase.from('factions').insert([{ ...factionForm, order_index: factions.length }]).select()
+      if (data) { setFactions([...factions, data[0]]); setSections(s => ({ ...s, [data[0].id]: [] })) }
+    }
+    setShowFactionModal(false)
+  }
+  const removeFaction = async (id) => {
+    await supabase.from('factions').delete().eq('id', id)
+    setFactions(factions.filter(f => f.id !== id))
+    setSections(s => { const n = { ...s }; delete n[id]; return n })
+  }
+
+  const openAddSection = (factionId) => { setEditingSection(null); setActiveFactionId(factionId); setSectionForm({ title: '', content: '' }); setShowSectionModal(true) }
+  const openEditSection = (sec, factionId) => { setEditingSection(sec); setActiveFactionId(factionId); setSectionForm({ title: sec.title, content: sec.content || '' }); setShowSectionModal(true) }
+  const saveSection = async () => {
+    if (!sectionForm.title) return
+    if (editingSection) {
+      const { data } = await supabase.from('faction_sections').update(sectionForm).eq('id', editingSection.id).select()
+      if (data) setSections(s => ({ ...s, [activeFactionId]: s[activeFactionId].map(sec => sec.id === editingSection.id ? data[0] : sec) }))
+    } else {
+      const order = (sections[activeFactionId] || []).length
+      const { data } = await supabase.from('faction_sections').insert([{ ...sectionForm, faction_id: activeFactionId, order_index: order }]).select()
+      if (data) setSections(s => ({ ...s, [activeFactionId]: [...(s[activeFactionId] || []), data[0]] }))
+    }
+    setShowSectionModal(false)
+  }
+  const removeSection = async (secId, factionId) => {
+    await supabase.from('faction_sections').delete().eq('id', secId)
+    setSections(s => ({ ...s, [factionId]: s[factionId].filter(sec => sec.id !== secId) }))
+  }
+
+  if (loading) return <p style={{ color: T.inkFaint }}>Caricamento...</p>
+  return (
+    <div>
+      <SH title="⚜ Fazioni" action={isDM && <BtnP onClick={openAddFaction}>+ Fazione</BtnP>} />
+      {factions.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessuna fazione ancora registrata...</p>}
+      {factions.map(faction => (
+        <div key={faction.id} style={{ marginBottom: 16 }}>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', cursor: 'pointer', borderBottom: collapsed[faction.id] ? 'none' : `1px solid ${T.parchmentDarker}` }}
+              onClick={() => toggleFaction(faction.id)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ color: T.gold, fontSize: 12 }}>{collapsed[faction.id] ? '▶' : '▼'}</span>
+                <span style={{ fontWeight: 700, fontSize: 17, color: T.ink, ...headerFont }}>{faction.name}</span>
+              </div>
+              {isDM && (
+                <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                  <button onClick={() => openEditFaction(faction)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>✏️</button>
+                  <button onClick={() => removeFaction(faction.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button>
+                </div>
+              )}
+            </div>
+            {!collapsed[faction.id] && (
+              <div style={{ padding: '12px 16px' }}>
+                {faction.description && <p style={{ fontSize: 15, color: T.inkLight, lineHeight: 1.7, margin: '0 0 12px', fontStyle: 'italic' }}>{faction.description}</p>}
+                {(sections[faction.id] || []).map(sec => (
+                  <div key={sec.id} style={{ marginBottom: 8, border: `1px solid ${T.parchmentDarker}`, borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', cursor: 'pointer', background: T.parchmentDark + '88' }}
+                      onClick={() => toggleSection(sec.id)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ color: T.inkFaint, fontSize: 11 }}>{collapsedSections[sec.id] ? '▶' : '▼'}</span>
+                        <span style={{ fontWeight: 600, fontSize: 15, color: T.red, ...headerFont }}>{sec.title}</span>
+                      </div>
+                      {isDM && (
+                        <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                          <button onClick={() => openEditSection(sec, faction.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 4, color: T.inkFaint }}>✏️</button>
+                          <button onClick={() => removeSection(sec.id, faction.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: 4, color: T.inkFaint }}>🗑️</button>
+                        </div>
+                      )}
+                    </div>
+                    {!collapsedSections[sec.id] && (
+                      <div style={{ padding: '10px 14px' }}>
+                        <p style={{ fontSize: 15, lineHeight: 1.8, color: T.inkLight, margin: 0, whiteSpace: 'pre-wrap' }}>{sec.content || <span style={{ fontStyle: 'italic', color: T.inkFaint }}>Nessun contenuto.</span>}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {isDM && (
+                  <button onClick={() => openAddSection(faction.id)}
+                    style={{ marginTop: 8, background: 'transparent', border: `1px dashed ${T.parchmentDarker}`, borderRadius: 4, padding: '8px 14px', fontSize: 14, cursor: 'pointer', color: T.inkFaint, width: '100%', textAlign: 'left', ...bodyFont }}>
+                    + Aggiungi sezione
+                  </button>
+                )}
+              </div>
+            )}
+          </Card>
+        </div>
+      ))}
+      {showFactionModal && (
+        <Modal title={editingFaction ? 'Modifica Fazione' : 'Nuova Fazione'} onClose={() => setShowFactionModal(false)}>
+          <FF label="Nome"><Input value={factionForm.name} onChange={e => setFactionForm({ ...factionForm, name: e.target.value })} placeholder="es. Impero di Zandria" /></FF>
+          <FF label="Descrizione"><Textarea value={factionForm.description} onChange={e => setFactionForm({ ...factionForm, description: e.target.value })} /></FF>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowFactionModal(false)}>Annulla</BtnS><BtnP onClick={saveFaction}>Salva</BtnP></div>
+        </Modal>
+      )}
+      {showSectionModal && (
+        <Modal title={editingSection ? 'Modifica Sezione' : 'Nuova Sezione'} onClose={() => setShowSectionModal(false)}>
+          <FF label="Titolo"><Input value={sectionForm.title} onChange={e => setSectionForm({ ...sectionForm, title: e.target.value })} placeholder="es. Storia, Sede, Governance..." /></FF>
+          <FF label="Contenuto"><Textarea value={sectionForm.content} onChange={e => setSectionForm({ ...sectionForm, content: e.target.value })} style={{ minHeight: 160 }} /></FF>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowSectionModal(false)}>Annulla</BtnS><BtnP onClick={saveSection}>Salva</BtnP></div>
         </Modal>
       )}
     </div>
@@ -1262,12 +1444,43 @@ function DiceSection() {
   )
 }
 
+// ─── Cambio password ──────────────────────────────────────────────────────────
+function ChangePasswordModal({ onClose }) {
+  const [newPassword, setNewPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState('')
+  const save = async () => {
+    if (newPassword.length < 6) { setError('Minimo 6 caratteri.'); return }
+    if (newPassword !== confirm) { setError('Le password non coincidono.'); return }
+    setLoading(true); setError('')
+    const { error: err } = await supabase.auth.updateUser({ password: newPassword })
+    setLoading(false)
+    if (err) { setError('Errore: ' + err.message) } else { setSuccess(true); setTimeout(onClose, 2000) }
+  }
+  return (
+    <Modal title="🔐 Cambia Password" onClose={onClose}>
+      {success
+        ? <div style={{ textAlign: 'center', padding: '2rem' }}><div style={{ fontSize: 48, marginBottom: 12 }}>✅</div><p style={{ color: T.green, fontSize: 16 }}>Password aggiornata!</p></div>
+        : <div>
+            <p style={{ fontSize: 15, color: T.inkLight, marginBottom: 16 }}>Solo tu conoscerai la nuova password.</p>
+            <FF label="Nuova password"><Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimo 6 caratteri" /></FF>
+            <FF label="Conferma"><Input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Ripeti la password" /></FF>
+            {error && <p style={{ color: T.red, fontSize: 14, marginBottom: 12 }}>{error}</p>}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={onClose}>Annulla</BtnS><BtnP onClick={save} disabled={loading}>{loading ? 'Salvataggio...' : 'Aggiorna'}</BtnP></div>
+          </div>}
+    </Modal>
+  )
+}
+
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM }) {
+function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM, onChangePassword }) {
   const DM_SECTIONS = [
     { id: 'sessioni', label: 'Sessioni', icon: '📜' },
-    { id: 'npc', label: 'Personaggi', icon: '🧑‍🤝‍🧑' },
+    { id: 'npc', label: 'NPC', icon: '⚔' },
     { id: 'mappa', label: 'Mappa', icon: '🗺️' },
+    { id: 'fazioni', label: 'Fazioni', icon: '⚜' },
     { id: 'timeline', label: 'Cronaca', icon: '📅' },
     { id: 'spells', label: 'Incantesimi', icon: '✨' },
     { id: 'party', label: 'Compagnia', icon: '⚔️' },
@@ -1310,7 +1523,8 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
           <div style={{ fontSize: 10, color: T.goldLight, padding: '0 0.75rem', marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'Cinzel', Georgia, serif" }}>LA COMPAGNIA</div>
           {playerSections.map(p => <button key={p.id} onClick={() => handleNav('player_' + p.id)} style={btnStyle('player_' + p.id)}><span style={{ width: 10, height: 10, borderRadius: '50%', background: p.player_color || T.gold, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 4px ${p.player_color || T.gold}88` }} />{p.username}</button>)}
         </div>
-        <div style={{ padding: '0.75rem', borderTop: `1px solid ${T.gold}33` }}>
+        <div style={{ padding: '0.75rem', borderTop: `1px solid ${T.gold}33`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={() => { onClose(); onChangePassword() }} style={{ width: '100%', padding: '10px 12px', borderRadius: 4, border: `1px solid ${T.gold}44`, background: `${T.gold}11`, fontSize: 14, cursor: 'pointer', color: T.parchmentDarker, textAlign: 'left', minHeight: 44, fontFamily: "'Crimson Text', Georgia, serif" }}>🔐 Cambia Password</button>
           <button onClick={() => { onClose(); onLogout() }} style={{ width: '100%', padding: '10px 12px', borderRadius: 4, border: `1px solid ${T.red}44`, background: `${T.red}22`, fontSize: 14, cursor: 'pointer', color: T.parchmentDarker, textAlign: 'left', minHeight: 44, fontFamily: "'Crimson Text', Georgia, serif" }}>← Abbandona l'avventura</button>
         </div>
       </div>
@@ -1323,17 +1537,19 @@ export default function Campaign({ profile, onLogout }) {
   const [players, setPlayers] = useState([])
   const [activeSection, setActiveSection] = useState('sessioni')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
   const isDM = profile?.role === 'dm'
 
   useEffect(() => { supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => setPlayers(data || [])) }, [])
 
-  const LABELS = { sessioni: '📜 Sessioni', npc: '🧑‍🤝‍🧑 Personaggi', mappa: '🗺️ Mappa', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', note_dm: '🔒 Pergamene Segrete' }
+  const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', note_dm: '🔒 Pergamene Segrete' }
   const currentLabel = activeSection.startsWith('player_') ? (players.find(p => p.id === activeSection.replace('player_', ''))?.username || 'Avventuriero') : (LABELS[activeSection] || activeSection)
 
   const renderSection = () => {
     if (activeSection === 'sessioni') return <SessionsSection isDM={isDM} />
     if (activeSection === 'npc') return <NPCSection isDM={isDM} />
     if (activeSection === 'mappa') return <MapSection isDM={isDM} />
+    if (activeSection === 'fazioni') return <FactionsSection isDM={isDM} />
     if (activeSection === 'timeline') return <TimelineSection isDM={isDM} />
     if (activeSection === 'spells') return <SpellsSection />
     if (activeSection === 'party') return <SharedSection />
@@ -1359,7 +1575,7 @@ export default function Campaign({ profile, onLogout }) {
         <span style={{ fontWeight: 600, fontSize: 15, flex: 1, color: T.parchment, fontFamily: "'Cinzel', Georgia, serif", letterSpacing: '0.03em' }}>{currentLabel}</span>
         <span style={{ fontSize: 13, color: T.goldLight, fontStyle: 'italic' }}>{profile?.username}</span>
       </div>
-      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSection} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} />
+      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSection} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} />
       <div style={{ padding: '1.25rem 1rem', maxWidth: 900, margin: '0 auto' }}>
         <div style={{ ...parchmentBg, borderRadius: 8, padding: '1.5rem', minHeight: 'calc(100vh - 80px)', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)', border: `1px solid ${T.parchmentDarker}` }}>
           {renderSection()}
