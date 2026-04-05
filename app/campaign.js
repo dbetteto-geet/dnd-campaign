@@ -1581,6 +1581,7 @@ export default function Campaign({ profile, onLogout }) {
           {renderSection()}
         </div>
       </div>
+      {showPasswordModal && <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />}
     </div>
   )
 }
