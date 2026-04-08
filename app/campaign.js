@@ -2201,7 +2201,7 @@ ${lootEntry.notes}
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('Export error:', err)
-      alert('Errore durante l'esportazione: ' + err.message)
+      alert("Errore durante l'esportazione: " + err.message)
     }
     setExporting(false)
   }
