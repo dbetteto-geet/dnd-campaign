@@ -1275,7 +1275,7 @@ function PlayerTab({ player, currentUserId, isDM }) {
                   setCharacter(c => ({ ...c, saving_throws: ns }))
                 }
                 return (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: 12, marginBottom: 12 }}>
                     <Card style={{ padding: '0.75rem 1rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: T.gold, ...headerFont, letterSpacing: '0.05em' }}>ABILITÀ</span>
