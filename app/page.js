@@ -36,5 +36,5 @@ export default function Home() {
 
   if (loading) return <div style={{ padding: '2rem' }}>Caricamento...</div>
 
-  return <Campaign profile={profile} />
+  return <Campaign profile={profile} onLogout={logout} />
 }
