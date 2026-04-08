@@ -1913,7 +1913,7 @@ function ChangePasswordModal({ onClose }) {
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM, onChangePassword }) {
+function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM, onChangePassword, onExport }) {
   const DM_SECTIONS = [
     { id: 'sessioni', label: 'Sessioni', icon: '📜' },
     { id: 'npc', label: 'NPC', icon: '⚔' },
@@ -1963,6 +1963,7 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
           {playerSections.map(p => <button key={p.id} onClick={() => handleNav('player_' + p.id)} style={btnStyle('player_' + p.id)}><span style={{ width: 10, height: 10, borderRadius: '50%', background: p.player_color || T.gold, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 4px ${p.player_color || T.gold}88` }} />{p.username}</button>)}
         </div>
         <div style={{ padding: '0.75rem', borderTop: `1px solid ${T.gold}33`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {isDM && <button onClick={() => { onClose(); onExport() }} style={{ width: '100%', padding: '10px 12px', borderRadius: 4, border: `1px solid ${T.green}44`, background: `${T.green}11`, fontSize: 14, cursor: 'pointer', color: T.parchmentDarker, textAlign: 'left', minHeight: 44, fontFamily: "'Crimson Text', Georgia, serif" }}>📦 Esporta Knowledge Base</button>}
           <button onClick={() => { onClose(); onChangePassword() }} style={{ width: '100%', padding: '10px 12px', borderRadius: 4, border: `1px solid ${T.gold}44`, background: `${T.gold}11`, fontSize: 14, cursor: 'pointer', color: T.parchmentDarker, textAlign: 'left', minHeight: 44, fontFamily: "'Crimson Text', Georgia, serif" }}>🔐 Cambia Password</button>
           <button onClick={() => { onClose(); onLogout() }} style={{ width: '100%', padding: '10px 12px', borderRadius: 4, border: `1px solid ${T.red}44`, background: `${T.red}22`, fontSize: 14, cursor: 'pointer', color: T.parchmentDarker, textAlign: 'left', minHeight: 44, fontFamily: "'Crimson Text', Georgia, serif" }}>← Abbandona l'avventura</button>
         </div>
@@ -1984,7 +1985,223 @@ export default function Campaign({ profile, onLogout }) {
   }
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const isDM = profile?.role === 'dm'
+
+  const exportKnowledgeBase = async () => {
+    setExporting(true)
+    try {
+      const [sessions, npcs, factions, factionSections, lore, loreSections, timeline, quests, players_data, loot] = await Promise.all([
+        supabase.from('sessions').select('*').order('number'),
+        supabase.from('npcs').select('*').order('name'),
+        supabase.from('factions').select('*').order('order_index'),
+        supabase.from('faction_sections').select('*').order('order_index'),
+        supabase.from('lore').select('*').order('order_index'),
+        supabase.from('lore_sections').select('*').order('order_index'),
+        supabase.from('timeline_events').select('*').order('created_at'),
+        supabase.from('quests').select('*').order('created_at'),
+        supabase.from('characters').select('*, profiles(username)'),
+        supabase.from('party_loot').select('*'),
+      ])
+
+      let md = `# Knowledge Base — Dungeons & Cinghiali
+
+`
+      md += `*Esportato il ${new Date().toLocaleDateString('it-IT')}*
+
+---
+
+`
+
+      // Sessioni
+      md += `# SESSIONI
+
+`
+      for (const s of sessions.data || []) {
+        md += `## Sessione ${s.number}${s.title ? ` — ${s.title}` : ''}
+`
+        if (s.date) md += `*Data: ${new Date(s.date).toLocaleDateString('it-IT')}*
+
+`
+        if (s.summary) md += `${s.summary}
+
+`
+        md += `---
+
+`
+      }
+
+      // NPC
+      md += `# PERSONAGGI NON GIOCANTI (NPC)
+
+`
+      for (const n of npcs.data || []) {
+        md += `## ${n.name}
+`
+        if (n.role) md += `**Ruolo:** ${n.role}
+`
+        if (n.attitude) md += `**Attitudine:** ${n.attitude}
+`
+        if (n.vitality) md += `**Stato:** ${n.vitality}
+`
+        if (n.faction) md += `**Fazione:** ${n.faction}
+`
+        if (n.first_location) md += `**Primo incontro:** ${n.first_location}
+`
+        if (n.current_location) md += `**Posizione attuale:** ${n.current_location}
+`
+        if (n.description) md += `
+${n.description}
+`
+        if (n.notes_dm) md += `
+**NOTE DM (riservate):** ${n.notes_dm}
+`
+        md += `
+---
+
+`
+      }
+
+      // Fazioni
+      if ((factions.data || []).length > 0) {
+        md += `# FAZIONI
+
+`
+        for (const f of factions.data || []) {
+          md += `## ${f.name}
+`
+          if (f.description) md += `${f.description}
+
+`
+          const secs = (factionSections.data || []).filter(s => s.faction_id === f.id)
+          for (const sec of secs) {
+            md += `### ${sec.title}
+`
+            if (sec.content) md += `${sec.content}
+`
+            md += `
+`
+          }
+          md += `---
+
+`
+        }
+      }
+
+      // Lore
+      if ((lore.data || []).length > 0) {
+        md += `# LORE
+
+`
+        for (const l of lore.data || []) {
+          md += `## ${l.name}
+`
+          if (l.description) md += `${l.description}
+
+`
+          const secs = (loreSections.data || []).filter(s => s.lore_id === l.id)
+          for (const sec of secs) {
+            md += `### ${sec.title}
+`
+            if (sec.content) md += `${sec.content}
+`
+            md += `
+`
+          }
+          md += `---
+
+`
+        }
+      }
+
+      // Timeline
+      if ((timeline.data || []).length > 0) {
+        md += `# TIMELINE
+
+`
+        for (const e of timeline.data || []) {
+          md += `## ${e.title}
+`
+          if (e.date_ingame) md += `*${e.date_ingame}* — `
+          if (e.type) md += `[${e.type}]
+`
+          if (e.description) md += `
+${e.description}
+`
+          md += `
+`
+        }
+        md += `---
+
+`
+      }
+
+      // Quest
+      if ((quests.data || []).length > 0) {
+        md += `# MISSIONI
+
+`
+        for (const q of quests.data || []) {
+          md += `## ${q.title} [${q.status}]
+`
+          if (q.description) md += `${q.description}
+`
+          if (q.reward) md += `*Ricompensa: ${q.reward}*
+`
+          md += `
+`
+        }
+        md += `---
+
+`
+      }
+
+      // Personaggi
+      if ((players_data.data || []).length > 0) {
+        md += `# PERSONAGGI GIOCANTI
+
+`
+        for (const c of players_data.data || []) {
+          md += `## ${c.name || 'Personaggio senza nome'}
+`
+          if (c.race && c.class) md += `**${c.race} ${c.class}** — Livello ${c.level || '?'}
+`
+          if (c.background) md += `**Background:** ${c.background}
+`
+          md += `
+`
+        }
+        md += `---
+
+`
+      }
+
+      // Loot
+      const lootEntry = (loot.data || []).find(l => l.name === '__loot_text__')
+      if (lootEntry?.notes) {
+        md += `# BOTTINO DEL GRUPPO
+
+${lootEntry.notes}
+
+---
+
+`
+      }
+
+      // Download
+      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `dnd-cinghiali-knowledge-base-${new Date().toISOString().split('T')[0]}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Export error:', err)
+      alert('Errore durante l'esportazione: ' + err.message)
+    }
+    setExporting(false)
+  }
 
   useEffect(() => { supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => setPlayers(data || [])) }, [])
 
@@ -2020,9 +2237,10 @@ export default function Campaign({ profile, onLogout }) {
         </button>
         <span style={{ fontSize: 20 }}>🐗</span>
         <span style={{ fontWeight: 600, fontSize: 15, flex: 1, color: T.parchment, fontFamily: "'Cinzel', Georgia, serif", letterSpacing: '0.03em' }}>{currentLabel}</span>
+        {exporting && <span style={{ fontSize: 12, color: T.goldLight, fontStyle: 'italic' }}>⏳ Esportazione...</span>}
         <span style={{ fontSize: 13, color: T.goldLight, fontStyle: 'italic' }}>{profile?.username}</span>
       </div>
-      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} />
+      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} onExport={exportKnowledgeBase} />
       <div style={{ padding: '1.25rem 1rem', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ ...parchmentBg, borderRadius: 8, padding: '1.5rem', minHeight: 'calc(100vh - 80px)', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)', border: `1px solid ${T.parchmentDarker}` }}>
           {renderSection()}
