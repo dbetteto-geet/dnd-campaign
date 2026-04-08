@@ -4,18 +4,21 @@ import { supabase } from '../lib/supabase'
 
 
 // ─── Rich Text Editor ─────────────────────────────────────────────────────────
-function insertMd(ref, before, after, placeholder) {
-  const el = ref.current; if (!el) return
-  const s = el.selectionStart, e = el.selectionEnd
-  const sel = el.value.substring(s, e) || placeholder || ''
-  const newVal = el.value.substring(0, s) + before + sel + after + el.value.substring(e)
-  const event = Object.assign(new Event('input', { bubbles: true }), { target: { value: newVal } })
-  Object.defineProperty(event, 'target', { value: el })
-  el.value = newVal
-  el.selectionStart = s + before.length
-  el.selectionEnd = s + before.length + sel.length
-  el.dispatchEvent(event)
-  el.focus()
+function useInsertMd(value, onChange) {
+  const ref = useRef()
+  const insert = (before, after = '', placeholder = '') => {
+    const el = ref.current; if (!el) return
+    const s = el.selectionStart, e = el.selectionEnd
+    const sel = (value || '').substring(s, e) || placeholder
+    const newVal = (value || '').substring(0, s) + before + sel + after + (value || '').substring(e)
+    onChange(newVal)
+    setTimeout(() => {
+      el.selectionStart = s + before.length
+      el.selectionEnd = s + before.length + sel.length
+      el.focus()
+    }, 0)
+  }
+  return { ref, insert }
 }
 
 function renderMd(text) {
@@ -41,7 +44,7 @@ function RichText({ value, style }) {
 }
 
 function RichEditor({ value, onChange, placeholder, height }) {
-  const taRef = useRef()
+  const { ref: taRef, insert } = useInsertMd(value, onChange)
   const [preview, setPreview] = useState(false)
   const [showLink, setShowLink] = useState(false)
   const [showImg, setShowImg] = useState(false)
