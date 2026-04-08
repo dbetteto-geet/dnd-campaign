@@ -43,8 +43,7 @@ export default function RootLayout({ children }) {
   }
 `}} />
 <link rel="icon" type="image/png" href="/icon-192.png" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@uiw/react-md-editor/markdown-editor.css" />
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@uiw/react-markdown-preview/markdown-preview.css" />     
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@uiw/react-md-editor@4/dist/mdeditor.min.css" />   
 </head>
       <body>{children}</body>
     </html>
