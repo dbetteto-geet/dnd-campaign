@@ -43,8 +43,8 @@ export default function RootLayout({ children }) {
   }
 `}} />
 <link rel="icon" type="image/png" href="/icon-192.png" />
-<link rel="stylesheet" href="https://uiw.github.io/react-md-editor/markdown-editor.css" />
-<link rel="stylesheet" href="https://uiw.github.io/react-markdown-preview/markdown.css" />      
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@uiw/react-md-editor/markdown-editor.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@uiw/react-markdown-preview/markdown-preview.css" />     
 </head>
       <body>{children}</body>
     </html>
