@@ -1,6 +1,9 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import dynamic from 'next/dynamic'
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
+const MDPreview = dynamic(() => import('@uiw/react-md-editor').then(m => m.default.Markdown), { ssr: false })
 
 const T = {
   parchment: '#f4e4c1', parchmentDark: '#e8d5a3', parchmentDarker: '#d4b896',
@@ -389,7 +392,7 @@ function SessionsSection({ isDM }) {
             {expanded === s.id && (
               <>
                 <Divider />
-                <p style={{ fontSize: 16, lineHeight: 1.8, color: T.inkLight, margin: 0, fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>{s.summary}</p>
+                <div data-color-mode="light"><MDPreview source={s.summary || ''} style={{ background: 'transparent', fontFamily: "'Crimson Text', Georgia, serif", color: T.inkLight, fontSize: 16 }} /></div>
                 {isDM && s.summary && (
                   <div style={{ marginTop: 12 }}>
                     <button onClick={e => { e.stopPropagation(); setAnalyzingSession(s) }} style={{ background: T.gold + '22', border: `1px solid ${T.gold}`, borderRadius: 4, cursor: 'pointer', fontSize: 14, padding: '8px 14px', color: T.gold, fontWeight: 600, ...headerFont }}>
@@ -408,7 +411,11 @@ function SessionsSection({ isDM }) {
           <FF label="Numero"><Input type="number" value={form.number} onChange={e => setForm({ ...form, number: e.target.value })} /></FF>
           <FF label="Titolo"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></FF>
           <FF label="Data"><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></FF>
-          <FF label="Riassunto"><Textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} style={{ minHeight: 200 }} /></FF>
+          <FF label="Riassunto">
+            <div data-color-mode="light">
+              <MDEditor value={form.summary || ''} onChange={v => setForm({ ...form, summary: v || '' })} height={250} />
+            </div>
+          </FF>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowModal(false)}>Annulla</BtnS><BtnP onClick={save}>Salva</BtnP></div>
         </Modal>
       )}
@@ -943,6 +950,8 @@ function SpellbookTab({ playerId, isOwner }) {
   const [srdSearch, setSrdSearch] = useState('')
   const [srdLoading, setSrdLoading] = useState(false)
   const [selectedSrd, setSelectedSrd] = useState(null)
+  const [selectedMulti, setSelectedMulti] = useState([]) // multi-select
+  const [expandedSpell, setExpandedSpell] = useState(null)
   const [customForm, setCustomForm] = useState({ spell_name: '', spell_level: 0, school: '', casting_time: '1 azione', is_concentration: false, is_bonus_action: false, is_ritual: false, description: '' })
 
   useEffect(() => { supabase.from('character_spells').select('*').eq('player_id', playerId).order('spell_level').then(({ data }) => { setSpells(data || []); setLoading(false) }) }, [playerId])
@@ -950,18 +959,23 @@ function SpellbookTab({ playerId, isOwner }) {
   const searchSrd = async (q) => {
     if (!q || q.length < 2) { setSrdSpells([]); return }
     setSrdLoading(true)
-    try { const res = await fetch(`https://www.dnd5eapi.co/api/spells?limit=500`); const data = await res.json(); setSrdSpells((data.results || []).filter(s => s.name.toLowerCase().includes(q.toLowerCase())).slice(0, 20)) } catch {}
+    try { const res = await fetch(`https://www.dnd5eapi.co/api/spells?limit=500`); const data = await res.json(); setSrdSpells((data.results || []).filter(s => s.name.toLowerCase().includes(q.toLowerCase())).slice(0, 30)) } catch {}
     setSrdLoading(false)
+  }
+  const toggleMultiSelect = (spell) => {
+    setSelectedMulti(prev => prev.find(s => s.index === spell.index) ? prev.filter(s => s.index !== spell.index) : [...prev, spell])
   }
   const loadSrdDetail = async (spell) => {
     const res = await fetch(`https://www.dnd5eapi.co/api/spells/${spell.index}`); const d = await res.json()
-    setSelectedSrd({ name: spell.name, level: d.level, school: d.school?.name || '', castingTime: d.casting_time, concentration: d.concentration, ritual: d.ritual, description: (d.desc || []).join(' '), isBonus: d.casting_time?.toLowerCase().includes('bonus') })
+    return { name: spell.name, level: d.level, school: d.school?.name || '', castingTime: d.casting_time, concentration: d.concentration, ritual: d.ritual, description: (d.desc || []).join(' '), isBonus: d.casting_time?.toLowerCase().includes('bonus') }
   }
   const addFromSrd = async () => {
-    if (!selectedSrd) return
-    const { data } = await supabase.from('character_spells').insert([{ player_id: playerId, spell_name: selectedSrd.name, spell_level: selectedSrd.level, school: selectedSrd.school, casting_time: selectedSrd.castingTime, is_concentration: selectedSrd.concentration || false, is_bonus_action: selectedSrd.isBonus || false, is_ritual: selectedSrd.ritual || false, description: selectedSrd.description, is_custom: false }]).select()
-    if (data) setSpells([...spells, data[0]])
-    setShowAddModal(false); setSelectedSrd(null); setSrdSearch(''); setSrdSpells([])
+    if (selectedMulti.length === 0 && !selectedSrd) return
+    const toAdd = selectedSrd ? [selectedSrd] : await Promise.all(selectedMulti.map(s => loadSrdDetail(s)))
+    const rows = toAdd.map(s => ({ player_id: playerId, spell_name: s.name, spell_level: s.level, school: s.school, casting_time: s.castingTime, is_concentration: s.concentration || false, is_bonus_action: s.isBonus || false, is_ritual: s.ritual || false, description: s.description, is_custom: false }))
+    const { data } = await supabase.from('character_spells').insert(rows).select()
+    if (data) setSpells([...spells, ...data])
+    setShowAddModal(false); setSelectedSrd(null); setSrdSearch(''); setSrdSpells([]); setSelectedMulti([])
   }
   const addCustom = async () => {
     if (!customForm.spell_name) return
@@ -992,15 +1006,17 @@ function SpellbookTab({ playerId, isOwner }) {
           {byLevel[level].map(spell => (
             <Card key={spell.id} style={{ padding: '0.75rem 1rem', marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setExpandedSpell(expandedSpell === spell.id ? null : spell.id)}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                     <span style={{ fontWeight: 600, fontSize: 16, color: T.ink, ...headerFont }}>{spell.spell_name}</span>
                     {spell.is_concentration && <Badge color={T.red}>Conc.</Badge>}
                     {spell.is_bonus_action && <Badge color={T.gold}>Azione bonus</Badge>}
                     {spell.is_ritual && <Badge color={T.purple}>Rituale</Badge>}
                     {spell.is_custom && <Badge color={T.inkFaint}>Custom</Badge>}
+                    <span style={{ display:'inline-block',width:0,height:0,borderTop:expandedSpell===spell.id?'5px solid transparent':'none',borderBottom:expandedSpell===spell.id?'5px solid transparent':'none',borderRight:expandedSpell===spell.id?'none':`7px solid ${T.inkFaint}`,borderLeft:expandedSpell===spell.id?`7px solid ${T.inkFaint}`:'none',marginTop:expandedSpell===spell.id?'3px':0 }} />
                   </div>
                   {spell.casting_time && <div style={{ fontSize: 13, color: T.inkFaint, fontStyle: 'italic' }}>{spell.casting_time}</div>}
+                  {expandedSpell === spell.id && spell.description && <p style={{ fontSize: 14, color: T.inkLight, lineHeight: 1.7, margin: '8px 0 0', fontStyle: 'italic' }}>{spell.description}</p>}
                 </div>
                 {isOwner && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flexShrink: 0 }}>
@@ -1022,12 +1038,27 @@ function SpellbookTab({ playerId, isOwner }) {
         </div>
       ))}
       {showAddModal && (
-        <Modal title="Aggiungi dal Compendio" onClose={() => { setShowAddModal(false); setSelectedSrd(null); setSrdSearch(''); setSrdSpells([]) }}>
+        <Modal title="Aggiungi dal Compendio" onClose={() => { setShowAddModal(false); setSelectedSrd(null); setSrdSearch(''); setSrdSpells([]); setSelectedMulti([]) }}>
           <FF label="Cerca incantesimo"><Input value={srdSearch} onChange={e => { setSrdSearch(e.target.value); searchSrd(e.target.value) }} placeholder="Digita il nome..." /></FF>
           {srdLoading && <p style={{ color: T.inkFaint, fontSize: 14, fontStyle: 'italic' }}>Consultando i tomi...</p>}
-          {srdSpells.length > 0 && !selectedSrd && <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16, maxHeight: 300, overflowY: 'auto' }}>{srdSpells.map(s => <button key={s.index} onClick={() => loadSrdDetail(s)} style={{ textAlign: 'left', padding: '10px 12px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 4, background: T.parchmentDark, cursor: 'pointer', fontSize: 15, color: T.ink, ...bodyFont }}>{s.name}</button>)}</div>}
-          {selectedSrd && <Card style={{ marginBottom: 16, border: `1.5px solid ${T.green}66` }}><div style={{ fontWeight: 600, fontSize: 16, color: T.ink, marginBottom: 8, ...headerFont }}>{selectedSrd.name}</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}><Badge color={T.blue}>{selectedSrd.level === 0 ? 'Trucchetto' : `Lv ${selectedSrd.level}`}</Badge>{selectedSrd.school && <Badge color={SCHOOL_COLORS[selectedSrd.school] || T.inkFaint}>{selectedSrd.school}</Badge>}{selectedSrd.concentration && <Badge color={T.red}>Concentrazione</Badge>}{selectedSrd.ritual && <Badge color={T.gold}>Rituale</Badge>}{selectedSrd.isBonus && <Badge color={T.gold}>Azione bonus</Badge>}</div><p style={{ fontSize: 13, color: T.inkFaint, margin: 0, lineHeight: 1.5, fontStyle: 'italic' }}>{selectedSrd.description?.substring(0, 150)}...</p><button onClick={() => { setSelectedSrd(null); setSrdSpells([]) }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: T.inkFaint, marginTop: 8 }}>← Cambia</button></Card>}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => { setShowAddModal(false); setSelectedSrd(null) }}>Annulla</BtnS><BtnP onClick={addFromSrd} disabled={!selectedSrd}>Aggiungi</BtnP></div>
+          {selectedMulti.length > 0 && <div style={{ background: `${T.green}11`, border: `1px solid ${T.green}44`, borderRadius: 4, padding: '8px 12px', marginBottom: 12, fontSize: 14, color: T.green }}>{selectedMulti.length} incantesimi selezionati</div>}
+          {srdSpells.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 16, maxHeight: 320, overflowY: 'auto' }}>
+              {srdSpells.map(s => {
+                const isSelected = selectedMulti.find(m => m.index === s.index)
+                return (
+                  <label key={s.index} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', border: `1px solid ${isSelected ? T.green : T.parchmentDarker}`, borderRadius: 4, background: isSelected ? `${T.green}11` : T.parchmentDark, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!isSelected} onChange={() => toggleMultiSelect(s)} style={{ width: 16, height: 16, accentColor: T.green }} />
+                    <span style={{ fontSize: 15, color: T.ink, ...bodyFont }}>{s.name}</span>
+                  </label>
+                )
+              })}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <BtnS onClick={() => { setShowAddModal(false); setSelectedSrd(null); setSelectedMulti([]) }}>Annulla</BtnS>
+            <BtnP onClick={addFromSrd} disabled={selectedMulti.length === 0}>Aggiungi {selectedMulti.length > 0 ? `(${selectedMulti.length})` : ''}</BtnP>
+          </div>
         </Modal>
       )}
       {showCustomModal && (
@@ -1177,7 +1208,7 @@ function PlayerTab({ player, currentUserId, isDM }) {
             </Card>
           ) : character ? (
             <div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 120px), 1fr))', gap: 10, marginBottom: 12 }}>
                 {[['Classe Armatura', character.ac], ['Livello', character.level], ['Background', character.background]].map(([k, v]) => <div key={k} style={{ ...cardStyle, textAlign: 'center' }}><div style={{ fontSize: 11, color: T.gold, marginBottom: 4, ...headerFont, letterSpacing: '0.05em' }}>{k.toUpperCase()}</div><div style={{ fontSize: 18, fontWeight: 700, color: T.ink, ...headerFont }}>{v}</div></div>)}
               </div>
               <Card style={{ marginBottom: 12 }}>
@@ -1186,10 +1217,117 @@ function PlayerTab({ player, currentUserId, isDM }) {
               </Card>
               <Card style={{ marginBottom: 12 }}>
                 <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 10px', color: T.gold, ...headerFont, letterSpacing: '0.06em' }}>CARATTERISTICHE</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0,1fr))', gap: 4 }}>
                   {STATS.map(([l, k]) => <div key={k} style={{ textAlign: 'center', background: T.parchmentDark, borderRadius: 4, padding: '8px 2px', border: `1px solid ${T.parchmentDarker}` }}><div style={{ fontSize: 10, color: T.gold, marginBottom: 2, ...headerFont }}>{l}</div><div style={{ fontSize: 16, fontWeight: 700, color: T.ink }}>{character[k] || 10}</div><div style={{ fontSize: 12, color: T.inkFaint }}>{mod(character[k])}</div></div>)}
                 </div>
               </Card>
+              {/* Abilità e Tiri Salvezza */}
+              {(() => {
+                const profBonus = Math.ceil(1 + (character.level || 1) / 4)
+                const SKILLS_DEF = [
+                  { name: 'Acrobazia', stat: 'dex', key: 'acrobatics' },
+                  { name: 'Addestrare animali', stat: 'wis', key: 'animal_handling' },
+                  { name: 'Arcano', stat: 'int', key: 'arcana' },
+                  { name: 'Atletica', stat: 'str', key: 'athletics' },
+                  { name: 'Furtività', stat: 'dex', key: 'stealth' },
+                  { name: 'Indagare', stat: 'int', key: 'investigation' },
+                  { name: 'Inganno', stat: 'cha', key: 'deception' },
+                  { name: 'Intimidire', stat: 'cha', key: 'intimidation' },
+                  { name: 'Intuizione', stat: 'wis', key: 'insight' },
+                  { name: 'Medicina', stat: 'wis', key: 'medicine' },
+                  { name: 'Natura', stat: 'int', key: 'nature' },
+                  { name: 'Percezione', stat: 'wis', key: 'perception' },
+                  { name: 'Performance', stat: 'cha', key: 'performance' },
+                  { name: 'Persuasione', stat: 'cha', key: 'persuasion' },
+                  { name: 'Rapidità di mano', stat: 'dex', key: 'sleight_of_hand' },
+                  { name: 'Religione', stat: 'int', key: 'religion' },
+                  { name: 'Storia', stat: 'int', key: 'history' },
+                  { name: 'Sopravvivenza', stat: 'wis', key: 'survival' },
+                ]
+                const SAVES_DEF = [
+                  { name: 'Forza', stat: 'str', key: 'save_str' },
+                  { name: 'Destrezza', stat: 'dex', key: 'save_dex' },
+                  { name: 'Costituzione', stat: 'con', key: 'save_con' },
+                  { name: 'Intelligenza', stat: 'int', key: 'save_int' },
+                  { name: 'Saggezza', stat: 'wis', key: 'save_wis' },
+                  { name: 'Carisma', stat: 'cha', key: 'save_cha' },
+                ]
+                const skills = character.skills || {}
+                const saves = character.saving_throws || {}
+                const statMod = (stat) => Math.floor(((character[stat] || 10) - 10) / 2)
+                const fmt = (v) => (v >= 0 ? '+' : '') + v
+                const getSkill = (sk) => {
+                  if (skills[sk.key] !== undefined && skills[sk.key] !== null && skills[sk.key] !== '') return parseInt(skills[sk.key])
+                  return skills[sk.key + '_prof'] ? statMod(sk.stat) + profBonus : statMod(sk.stat)
+                }
+                const getSave = (sv) => {
+                  if (saves[sv.key] !== undefined && saves[sv.key] !== null && saves[sv.key] !== '') return parseInt(saves[sv.key])
+                  return saves[sv.key + '_prof'] ? statMod(sv.stat) + profBonus : statMod(sv.stat)
+                }
+                const updateSkill = async (key, val) => {
+                  const ns = { ...skills, [key]: val }
+                  await supabase.from('characters').update({ skills: ns }).eq('id', character.id)
+                  setCharacter(c => ({ ...c, skills: ns }))
+                }
+                const updateSave = async (key, val) => {
+                  const ns = { ...saves, [key]: val }
+                  await supabase.from('characters').update({ saving_throws: ns }).eq('id', character.id)
+                  setCharacter(c => ({ ...c, saving_throws: ns }))
+                }
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                    <Card style={{ padding: '0.75rem 1rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: T.gold, ...headerFont, letterSpacing: '0.05em' }}>ABILITÀ</span>
+                        <span style={{ fontSize: 10, color: T.inkFaint }}>comp +{profBonus}</span>
+                      </div>
+                      {SKILLS_DEF.map(sk => {
+                        const isProf = !!skills[sk.key + '_prof']
+                        const val = getSkill(sk)
+                        return (
+                          <div key={sk.key} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', borderBottom: `1px solid ${T.parchmentDarker}44` }}>
+                            {isOwner ? (
+                              <button onClick={() => updateSkill(sk.key + '_prof', !isProf)} title="Competenza" style={{ width: 12, height: 12, borderRadius: '50%', border: `1.5px solid ${T.gold}`, background: isProf ? T.gold : 'transparent', cursor: 'pointer', flexShrink: 0, padding: 0 }} />
+                            ) : (
+                              <div style={{ width: 12, height: 12, borderRadius: '50%', border: `1.5px solid ${T.gold}`, background: isProf ? T.gold : 'transparent', flexShrink: 0 }} />
+                            )}
+                            <span style={{ fontSize: 11, color: T.inkFaint, width: 22, textAlign: 'right', flexShrink: 0, fontWeight: 600 }}>{fmt(val)}</span>
+                            <span style={{ fontSize: 11, color: T.inkLight, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sk.name}</span>
+                            {isOwner && (
+                              <input type="number" value={skills[sk.key] ?? ''} placeholder="—"
+                                onChange={e => updateSkill(sk.key, e.target.value === '' ? null : parseInt(e.target.value))}
+                                style={{ width: 32, fontSize: 10, padding: '1px 2px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 2, background: T.parchmentDark, color: T.ink, textAlign: 'center', flexShrink: 0 }} />
+                            )}
+                          </div>
+                        )
+                      })}
+                    </Card>
+                    <Card style={{ padding: '0.75rem 1rem' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: T.gold, ...headerFont, letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>TIRI SALVEZZA</span>
+                      {SAVES_DEF.map(sv => {
+                        const isProf = !!saves[sv.key + '_prof']
+                        const val = getSave(sv)
+                        return (
+                          <div key={sv.key} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: `1px solid ${T.parchmentDarker}44` }}>
+                            {isOwner ? (
+                              <button onClick={() => updateSave(sv.key + '_prof', !isProf)} title="Competenza" style={{ width: 12, height: 12, borderRadius: '50%', border: `1.5px solid ${T.gold}`, background: isProf ? T.gold : 'transparent', cursor: 'pointer', flexShrink: 0, padding: 0 }} />
+                            ) : (
+                              <div style={{ width: 12, height: 12, borderRadius: '50%', border: `1.5px solid ${T.gold}`, background: isProf ? T.gold : 'transparent', flexShrink: 0 }} />
+                            )}
+                            <span style={{ fontSize: 12, color: T.inkFaint, width: 24, textAlign: 'right', flexShrink: 0, fontWeight: 700 }}>{fmt(val)}</span>
+                            <span style={{ fontSize: 13, color: T.inkLight, flex: 1 }}>{sv.name}</span>
+                            {isOwner && (
+                              <input type="number" value={saves[sv.key] ?? ''} placeholder="—"
+                                onChange={e => updateSave(sv.key, e.target.value === '' ? null : parseInt(e.target.value))}
+                                style={{ width: 34, fontSize: 11, padding: '1px 3px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 3, background: T.parchmentDark, color: T.ink, textAlign: 'center' }} />
+                            )}
+                          </div>
+                        )
+                      })}
+                    </Card>
+                  </div>
+                )
+              })()}
               {character.attacks && (
                 <Card style={{ marginBottom: 12 }}>
                   <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 10px', color: T.gold, ...headerFont, letterSpacing: '0.06em' }}>ATTACCHI</p>
@@ -1298,12 +1436,12 @@ function PlayerTab({ player, currentUserId, isDM }) {
 
 // ─── Party ────────────────────────────────────────────────────────────────────
 function SharedSection() {
-  const [loot, setLoot] = useState([])
+  const [lootText, setLootText] = useState('')
+  const [lootId, setLootId] = useState(null)
+  const [editingLoot, setEditingLoot] = useState(false)
   const [quests, setQuests] = useState([])
   const [groupNotes, setGroupNotes] = useState([])
   const [partyCoins, setPartyCoins] = useState({ gold: 0, silver: 0, copper: 0, platinum: 0 })
-  const [showLootModal, setShowLootModal] = useState(false)
-  const [editingLoot, setEditingLoot] = useState(null)
   const [showQuestModal, setShowQuestModal] = useState(false)
   const [editingQuest, setEditingQuest] = useState(null)
   const [showNoteModal, setShowNoteModal] = useState(false)
@@ -1322,9 +1460,14 @@ function SharedSection() {
       supabase.from('group_notes').select('*').order('created_at', { ascending: false }),
     ]).then(([l, q, gn]) => {
       const coins = { gold: 0, silver: 0, copper: 0, platinum: 0 }
-      const items = []
-      ;(l.data || []).forEach(item => { if (item.name === '__coins__') { try { Object.assign(coins, JSON.parse(item.notes || '{}')) } catch {} } else { items.push(item) } })
-      setPartyCoins(coins); setLoot(items); setQuests(q.data || []); setGroupNotes(gn.data || []); setLoading(false)
+      let lootEntry = null
+      ;(l.data || []).forEach(item => {
+        if (item.name === '__coins__') { try { Object.assign(coins, JSON.parse(item.notes || '{}')) } catch {} }
+        else if (item.name === '__loot_text__') { lootEntry = item }
+      })
+      setPartyCoins(coins)
+      if (lootEntry) { setLootText(lootEntry.notes || ''); setLootId(lootEntry.id) }
+      setQuests(q.data || []); setGroupNotes(gn.data || []); setLoading(false)
     })
   }, [])
 
@@ -1334,15 +1477,11 @@ function SharedSection() {
     if (existing.data) { await supabase.from('party_loot').update({ notes: JSON.stringify(newCoins) }).eq('id', existing.data.id) }
     else { await supabase.from('party_loot').insert([{ name: '__coins__', quantity: 1, notes: JSON.stringify(newCoins) }]) }
   }
-  const openAddLoot = () => { setEditingLoot(null); setLootForm({ name: '', quantity: 1, notes: '' }); setShowLootModal(true) }
-  const openEditLoot = (item) => { setEditingLoot(item); setLootForm({ name: item.name, quantity: item.quantity, notes: item.notes || '' }); setShowLootModal(true) }
-  const saveLoot = async () => {
-    if (!lootForm.name) return
-    if (editingLoot) { const { data } = await supabase.from('party_loot').update(lootForm).eq('id', editingLoot.id).select(); if (data) setLoot(loot.map(l => l.id === editingLoot.id ? data[0] : l)) }
-    else { const { data } = await supabase.from('party_loot').insert([lootForm]).select(); if (data) setLoot([...loot, data[0]]) }
-    setShowLootModal(false)
+  const saveLootText = async (text) => {
+    setLootText(text)
+    if (lootId) { await supabase.from('party_loot').update({ notes: text }).eq('id', lootId) }
+    else { const { data } = await supabase.from('party_loot').insert([{ name: '__loot_text__', quantity: 1, notes: text }]).select(); if (data) setLootId(data[0].id) }
   }
-  const removeLoot = async (id) => { await supabase.from('party_loot').delete().eq('id', id); setLoot(loot.filter(l => l.id !== id)) }
   const openAddQuest = () => { setEditingQuest(null); setQuestForm({ title: '', description: '', status: 'attiva', reward: '' }); setShowQuestModal(true) }
   const openEditQuest = (q) => { setEditingQuest(q); setQuestForm({ title: q.title, description: q.description || '', status: q.status, reward: q.reward || '' }); setShowQuestModal(true) }
   const saveQuest = async () => {
@@ -1369,10 +1508,24 @@ function SharedSection() {
       {activeTab === 'loot' && (
         <div>
           <CoinsPanel values={partyCoins} onChange={(k, v) => savePartyCoins({ ...partyCoins, [k]: v })} editable={true} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 700, fontSize: 18, color: T.red, ...headerFont }}>⚔️ Bottino del Gruppo</span><BtnP onClick={openAddLoot}>+ Aggiungi</BtnP></div>
-          {loot.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Le casse del gruppo sono vuote...</p>}
-          {loot.map(item => <Card key={item.id} style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><div style={{ flex: 1 }}><span style={{ fontWeight: 600, color: T.ink, fontSize: 16, ...headerFont }}>{item.name}</span>{item.notes && <span style={{ fontSize: 13, color: T.inkFaint, marginLeft: 8, fontStyle: 'italic' }}>{item.notes}</span>}</div><div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}><span style={{ fontWeight: 700, color: T.gold, fontSize: 16 }}>×{item.quantity}</span><button onClick={() => openEditLoot(item)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>✏️</button><button onClick={() => removeLoot(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button></div></Card>)}
-          {showLootModal && <Modal title={editingLoot ? 'Modifica' : 'Aggiungi al Bottino'} onClose={() => setShowLootModal(false)}><FF label="Nome"><Input value={lootForm.name} onChange={e => setLootForm({ ...lootForm, name: e.target.value })} /></FF><FF label="Quantità"><Input type="number" value={lootForm.quantity} onChange={e => setLootForm({ ...lootForm, quantity: e.target.value })} /></FF><FF label="Note"><Input value={lootForm.notes} onChange={e => setLootForm({ ...lootForm, notes: e.target.value })} /></FF><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowLootModal(false)}>Annulla</BtnS><BtnP onClick={saveLoot}>Aggiungi</BtnP></div></Modal>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontWeight: 700, fontSize: 18, color: T.red, ...headerFont }}>⚔️ Bottino del Gruppo</span>
+            {!editingLoot && <BtnS onClick={() => setEditingLoot(true)}>✏️ Modifica</BtnS>}
+            {editingLoot && <div style={{ display: 'flex', gap: 8 }}><BtnS onClick={() => setEditingLoot(false)}>Annulla</BtnS><BtnP onClick={() => { saveLootText(lootText); setEditingLoot(false) }}>Salva</BtnP></div>}
+          </div>
+          {editingLoot ? (
+            <div data-color-mode="light">
+              <MDEditor value={lootText} onChange={v => setLootText(v || '')} height={400} />
+            </div>
+          ) : (
+            <Card>
+              {lootText ? (
+                <div data-color-mode="light"><MDPreview source={lootText} style={{ background: 'transparent', fontFamily: "'Crimson Text', Georgia, serif", color: T.inkLight, fontSize: 15 }} /></div>
+              ) : (
+                <p style={{ color: T.inkFaint, fontStyle: 'italic', margin: 0 }}>Le casse del gruppo sono vuote... Clicca Modifica per aggiungere il bottino.</p>
+              )}
+            </Card>
+          )}
         </div>
       )}
       {activeTab === 'quest' && (
