@@ -1,9 +1,147 @@
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import dynamic from 'next/dynamic'
-const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
-const MDPreview = dynamic(() => import('@uiw/react-md-editor').then(m => m.default.Markdown), { ssr: false })
+
+
+// ─── Rich Text Editor ─────────────────────────────────────────────────────────
+function insertMd(ref, before, after, placeholder) {
+  const el = ref.current; if (!el) return
+  const s = el.selectionStart, e = el.selectionEnd
+  const sel = el.value.substring(s, e) || placeholder || ''
+  const newVal = el.value.substring(0, s) + before + sel + after + el.value.substring(e)
+  const event = Object.assign(new Event('input', { bubbles: true }), { target: { value: newVal } })
+  Object.defineProperty(event, 'target', { value: el })
+  el.value = newVal
+  el.selectionStart = s + before.length
+  el.selectionEnd = s + before.length + sel.length
+  el.dispatchEvent(event)
+  el.focus()
+}
+
+function renderMd(text) {
+  if (!text) return ''
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/^### (.+)$/gm, '<h3 style="margin:10px 0 4px;font-size:16px;font-weight:700;color:#2c1810">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="margin:12px 0 6px;font-size:18px;font-weight:700;color:#2c1810">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="margin:14px 0 8px;font-size:20px;font-weight:700;color:#2c1810">$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%;border-radius:4px;margin:6px 0;display:block" />')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:#8b6914;text-decoration:underline">$1</a>')
+    .replace(/^- (.+)$/gm, '<li style="margin-left:18px;list-style-type:disc">$1</li>')
+    .replace(/^\d+\. (.+)$/gm, '<li style="margin-left:18px;list-style-type:decimal">$1</li>')
+    .replace(/(<li[^>]*>.*?<\/li>\n?)+/gs, m => `<ul style="margin:6px 0;padding:0">${m}</ul>`)
+    .replace(/\n/g, '<br/>')
+}
+
+function RichText({ value, style }) {
+  if (!value) return null
+  return <div style={{ fontSize: 15, lineHeight: 1.8, color: '#5c3d2e', fontFamily: "'Crimson Text', Georgia, serif", ...style }} dangerouslySetInnerHTML={{ __html: renderMd(value) }} />
+}
+
+function RichEditor({ value, onChange, placeholder, height }) {
+  const taRef = useRef()
+  const [preview, setPreview] = useState(false)
+  const [showLink, setShowLink] = useState(false)
+  const [showImg, setShowImg] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [linkText, setLinkText] = useState('')
+  const [imgUrl, setImgUrl] = useState('')
+  const [imgAlt, setImgAlt] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef()
+
+  const handleChange = (e) => onChange(e.target.value)
+  const TB = ({ label, action, title }) => (
+    <button type="button" title={title} onClick={action} style={{ background: 'none', border: `1px solid #d4b896`, borderRadius: 3, padding: '3px 7px', fontSize: 13, cursor: 'pointer', color: '#5c3d2e', minWidth: 28, minHeight: 28 }}>{label}</button>
+  )
+  const insertLink = () => {
+    if (!linkUrl) return
+    const md = `[${linkText || linkUrl}](${linkUrl})`
+    onChange((value || '') + md)
+    setShowLink(false); setLinkUrl(''); setLinkText('')
+  }
+  const insertImg = () => {
+    if (!imgUrl) return
+    const md = `\n![${imgAlt || 'immagine'}](${imgUrl})\n`
+    onChange((value || '') + md)
+    setShowImg(false); setImgUrl(''); setImgAlt('')
+  }
+  const uploadImg = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    setUploading(true)
+    const ext = file.name.split('.').pop()
+    const path = `content/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('content-images').upload(path, file)
+    if (!error) {
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/content-images/${path}`
+      setImgUrl(url)
+    }
+    setUploading(false)
+  }
+
+  return (
+    <div style={{ border: `1.5px solid #d4b896`, borderRadius: 6, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 3, padding: '5px 8px', background: '#e8d5a3', borderBottom: `1px solid #d4b896`, flexWrap: 'wrap', alignItems: 'center' }}>
+        <TB label={<strong>G</strong>} action={() => insertMd(taRef, '**', '**', 'grassetto')} title="Grassetto" />
+        <TB label={<em>C</em>} action={() => insertMd(taRef, '*', '*', 'corsivo')} title="Corsivo" />
+        <TB label="H1" action={() => insertMd(taRef, '# ', '', 'Titolo')} title="Titolo grande" />
+        <TB label="H2" action={() => insertMd(taRef, '## ', '', 'Titolo')} title="Titolo medio" />
+        <TB label="H3" action={() => insertMd(taRef, '### ', '', 'Titolo')} title="Titolo piccolo" />
+        <TB label="• —" action={() => insertMd(taRef, '\n- ', '', 'elemento')} title="Elenco puntato" />
+        <TB label="1. —" action={() => insertMd(taRef, '\n1. ', '', 'elemento')} title="Elenco numerato" />
+        <TB label="🔗" action={() => setShowLink(true)} title="Inserisci link" />
+        <TB label="🖼" action={() => setShowImg(true)} title="Inserisci immagine" />
+        <div style={{ flex: 1 }} />
+        <button type="button" onClick={() => setPreview(p => !p)} style={{ background: preview ? '#8b6914' : 'transparent', border: `1px solid #8b6914`, borderRadius: 3, padding: '3px 10px', fontSize: 12, cursor: 'pointer', color: preview ? '#fff' : '#8b6914', fontWeight: 600 }}>
+          {preview ? '✏️ Modifica' : '👁 Anteprima'}
+        </button>
+      </div>
+      {preview
+        ? <div style={{ padding: '12px 14px', minHeight: height || 200, background: '#f4e4c1', fontSize: 15, lineHeight: 1.8, color: '#5c3d2e', fontFamily: "'Crimson Text', Georgia, serif" }} dangerouslySetInnerHTML={{ __html: renderMd(value) || '<span style="color:#8b6355;font-style:italic">Nessun contenuto...</span>' }} />
+        : <textarea ref={taRef} value={value || ''} onChange={handleChange} placeholder={placeholder || 'Scrivi qui...'} style={{ width: '100%', boxSizing: 'border-box', minHeight: height || 200, padding: '12px 14px', background: '#f4e4c1', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.8, resize: 'vertical', color: '#2c1810', fontFamily: "'Crimson Text', Georgia, serif" }} />
+      }
+      {showLink && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#f4e4c1', borderRadius: 8, padding: '1.5rem', width: '90%', maxWidth: 400, border: '2px solid #8b6914' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#8b1a1a', fontFamily: "'Cinzel', Georgia, serif" }}>Inserisci Link</h3>
+            <div style={{ marginBottom: 12 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4, fontFamily: "'Cinzel', Georgia, serif" }}>TESTO</label><input value={linkText} onChange={e => setLinkText(e.target.value)} placeholder="Testo del link" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ marginBottom: 16 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4, fontFamily: "'Cinzel', Georgia, serif" }}>URL</label><input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowLink(false); setLinkUrl(''); setLinkText('') }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #d4b896', borderRadius: 4, cursor: 'pointer', color: '#8b6355' }}>Annulla</button>
+              <button onClick={insertLink} style={{ padding: '8px 16px', background: '#8b6914', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#fff', fontWeight: 600 }}>Inserisci</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showImg && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: '#f4e4c1', borderRadius: 8, padding: '1.5rem', width: '90%', maxWidth: 420, border: '2px solid #8b6914' }}>
+            <h3 style={{ margin: '0 0 16px', color: '#8b1a1a', fontFamily: "'Cinzel', Georgia, serif" }}>Inserisci Immagine</h3>
+            <div style={{ marginBottom: 14, background: '#e8d5a3', border: '1px dashed #d4b896', borderRadius: 6, padding: '12px', textAlign: 'center' }}>
+              <p style={{ fontSize: 13, color: '#8b6355', margin: '0 0 8px', fontStyle: 'italic' }}>Carica dal dispositivo</p>
+              <label style={{ display: 'inline-block', padding: '7px 16px', background: '#1a5c2e', color: '#f8edd8', borderRadius: 4, cursor: uploading ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600, opacity: uploading ? 0.7 : 1 }}>
+                {uploading ? '⏳ Caricamento...' : '📁 Scegli file'}
+                <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={uploadImg} />
+              </label>
+              {imgUrl && <p style={{ fontSize: 12, color: '#1a5c2e', margin: '8px 0 0' }}>✓ Pronta da inserire</p>}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <div style={{ flex: 1, height: 1, background: '#d4b896' }} /><span style={{ fontSize: 12, color: '#8b6355' }}>oppure da URL</span><div style={{ flex: 1, height: 1, background: '#d4b896' }} />
+            </div>
+            <div style={{ marginBottom: 12 }}><input value={imgUrl.startsWith('http') && !imgUrl.includes('content-images') ? imgUrl : imgUrl.includes('content-images') ? '' : imgUrl} onChange={e => setImgUrl(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ marginBottom: 16 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4, fontFamily: "'Cinzel', Georgia, serif" }}>TESTO ALTERNATIVO</label><input value={imgAlt} onChange={e => setImgAlt(e.target.value)} placeholder="Descrizione immagine" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setShowImg(false); setImgUrl(''); setImgAlt('') }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #d4b896', borderRadius: 4, cursor: 'pointer', color: '#8b6355' }}>Annulla</button>
+              <button onClick={insertImg} disabled={!imgUrl} style={{ padding: '8px 16px', background: imgUrl ? '#8b6914' : '#d4b896', border: 'none', borderRadius: 4, cursor: imgUrl ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 600 }}>Inserisci</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const T = {
   parchment: '#f4e4c1', parchmentDark: '#e8d5a3', parchmentDarker: '#d4b896',
@@ -392,7 +530,7 @@ function SessionsSection({ isDM }) {
             {expanded === s.id && (
               <>
                 <Divider />
-                <div data-color-mode="light"><MDPreview source={s.summary || ''} style={{ background: 'transparent', fontFamily: "'Crimson Text', Georgia, serif", color: T.inkLight, fontSize: 16 }} /></div>
+                <RichText value={s.summary} />
                 {isDM && s.summary && (
                   <div style={{ marginTop: 12 }}>
                     <button onClick={e => { e.stopPropagation(); setAnalyzingSession(s) }} style={{ background: T.gold + '22', border: `1px solid ${T.gold}`, borderRadius: 4, cursor: 'pointer', fontSize: 14, padding: '8px 14px', color: T.gold, fontWeight: 600, ...headerFont }}>
@@ -412,9 +550,7 @@ function SessionsSection({ isDM }) {
           <FF label="Titolo"><Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></FF>
           <FF label="Data"><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></FF>
           <FF label="Riassunto">
-            <div data-color-mode="light">
-              <MDEditor value={form.summary || ''} onChange={v => setForm({ ...form, summary: v || '' })} height={250} />
-            </div>
+            <RichEditor value={form.summary || ''} onChange={v => setForm({ ...form, summary: v })} placeholder="Scrivi il riassunto della sessione..." height={250} />
           </FF>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowModal(false)}>Annulla</BtnS><BtnP onClick={save}>Salva</BtnP></div>
         </Modal>
@@ -1514,16 +1650,10 @@ function SharedSection() {
             {editingLoot && <div style={{ display: 'flex', gap: 8 }}><BtnS onClick={() => setEditingLoot(false)}>Annulla</BtnS><BtnP onClick={() => { saveLootText(lootText); setEditingLoot(false) }}>Salva</BtnP></div>}
           </div>
           {editingLoot ? (
-            <div data-color-mode="light">
-              <MDEditor value={lootText} onChange={v => setLootText(v || '')} height={400} />
-            </div>
+            <RichEditor value={lootText} onChange={v => setLootText(v)} placeholder="Descrivi il bottino: armi, oggetti magici, tesori..." height={350} />
           ) : (
             <Card>
-              {lootText ? (
-                <div data-color-mode="light"><MDPreview source={lootText} style={{ background: 'transparent', fontFamily: "'Crimson Text', Georgia, serif", color: T.inkLight, fontSize: 15 }} /></div>
-              ) : (
-                <p style={{ color: T.inkFaint, fontStyle: 'italic', margin: 0 }}>Le casse del gruppo sono vuote... Clicca Modifica per aggiungere il bottino.</p>
-              )}
+              {lootText ? <RichText value={lootText} /> : <p style={{ color: T.inkFaint, fontStyle: 'italic', margin: 0 }}>Le casse del gruppo sono vuote... Clicca Modifica per aggiungere il bottino.</p>}
             </Card>
           )}
         </div>
