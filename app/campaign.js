@@ -55,7 +55,6 @@ function RichEditor({ value, onChange, placeholder, height }) {
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef()
 
-  const handleChange = (e) => onChange(e.target.value)
   const TB = ({ label, action, title }) => (
     <button type="button" title={title} onClick={action} style={{ background: 'none', border: `1px solid #d4b896`, borderRadius: 3, padding: '3px 7px', fontSize: 13, cursor: 'pointer', color: '#5c3d2e', minWidth: 28, minHeight: 28 }}>{label}</button>
   )
@@ -1351,7 +1350,19 @@ function PlayerTab({ player, currentUserId, isDM }) {
                 {[['Classe Armatura', character.ac], ['Livello', character.level], ['Background', character.background]].map(([k, v]) => <div key={k} style={{ ...cardStyle, textAlign: 'center' }}><div style={{ fontSize: 11, color: T.gold, marginBottom: 4, ...headerFont, letterSpacing: '0.05em' }}>{k.toUpperCase()}</div><div style={{ fontSize: 18, fontWeight: 700, color: T.ink, ...headerFont }}>{v}</div></div>)}
               </div>
               <Card style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><span style={{ fontSize: 14, color: T.inkFaint, fontStyle: 'italic' }}>Punti Ferita</span><span style={{ fontSize: 16, fontWeight: 700, color: T.ink, ...headerFont }}>{character.hp} / {character.max_hp}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <span style={{ fontSize: 14, color: T.inkFaint, fontStyle: 'italic' }}>Punti Ferita</span>
+                  {isOwner ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button onClick={async () => { const newHp = Math.max(0, character.hp - 1); await supabase.from('characters').update({ hp: newHp }).eq('id', character.id); setCharacter(c => ({ ...c, hp: newHp })) }} style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px solid ${T.red}`, background: T.red + '22', cursor: 'pointer', fontSize: 16, color: T.red, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+                      <input type="number" value={character.hp} onChange={async e => { const v = parseInt(e.target.value) || 0; await supabase.from('characters').update({ hp: v }).eq('id', character.id); setCharacter(c => ({ ...c, hp: v })) }} style={{ width: 48, textAlign: 'center', fontSize: 16, fontWeight: 700, border: `1px solid ${T.parchmentDarker}`, borderRadius: 4, background: T.parchmentDark, color: T.ink, padding: '2px 4px' }} />
+                      <span style={{ fontSize: 14, color: T.inkFaint }}>/ {character.max_hp}</span>
+                      <button onClick={async () => { const newHp = Math.min(character.max_hp, character.hp + 1); await supabase.from('characters').update({ hp: newHp }).eq('id', character.id); setCharacter(c => ({ ...c, hp: newHp })) }} style={{ width: 28, height: 28, borderRadius: '50%', border: `1.5px solid ${T.green}`, background: T.green + '22', cursor: 'pointer', fontSize: 16, color: T.green, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: 16, fontWeight: 700, color: T.ink, ...headerFont }}>{character.hp} / {character.max_hp}</span>
+                  )}
+                </div>
                 <div style={{ height: 12, background: T.parchmentDarker, borderRadius: 6, overflow: 'hidden' }}><div style={{ height: '100%', width: `${hpPct}%`, background: `linear-gradient(to right, ${hpColor}, ${hpColor}cc)`, borderRadius: 6, transition: 'width 0.4s' }} /></div>
               </Card>
               <Card style={{ marginBottom: 12 }}>
@@ -1494,6 +1505,7 @@ function PlayerTab({ player, currentUserId, isDM }) {
       {activeTab === 'inventario' && (
         <div>
           <CoinsPanel values={character || charForm} onChange={handleCoin} editable={isOwner} />
+          <PotionsPanel character={character} isOwner={isOwner} onUpdate={setCharacter} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>{isOwner && <BtnP onClick={openAddItem}>+ Aggiungi Oggetto</BtnP>}</div>
           {inventory.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Le borse sono vuote...</p>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1569,6 +1581,199 @@ function PlayerTab({ player, currentUserId, isDM }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Pozioni ─────────────────────────────────────────────────────────────────
+const POZIONI = [
+  { key: 'minore', label: 'Minore', dice: '2d4', bonus: 2, color: '#e74c3c' },
+  { key: 'maggiore', label: 'Maggiore', dice: '4d4', bonus: 4, color: '#e67e22' },
+  { key: 'superiore', label: 'Superiore', dice: '8d4', bonus: 8, color: '#8e44ad' },
+  { key: 'suprema', label: 'Suprema', dice: '10d4', bonus: 20, color: '#2980b9' },
+]
+
+function rollDice(diceStr) {
+  const [n, d] = diceStr.split('d').map(Number)
+  let total = 0
+  for (let i = 0; i < n; i++) total += Math.floor(Math.random() * d) + 1
+  return total
+}
+
+function PotionsPanel({ character, isOwner, onUpdate }) {
+  const [result, setResult] = useState(null)
+  if (!character) return null
+  const potions = character.potions || {}
+
+  const updatePotions = async (newPotions) => {
+    await supabase.from('characters').update({ potions: newPotions }).eq('id', character.id)
+    onUpdate(c => ({ ...c, potions: newPotions }))
+  }
+
+  const usaPozione = async (p) => {
+    const qty = potions[p.key] || 0
+    if (qty <= 0) return
+    const rolled = rollDice(p.dice)
+    const total = rolled + p.bonus
+    const newPotions = { ...potions, [p.key]: qty - 1 }
+    await updatePotions(newPotions)
+    // Heal HP
+    const newHp = Math.min(character.max_hp, character.hp + total)
+    await supabase.from('characters').update({ hp: newHp }).eq('id', character.id)
+    onUpdate(c => ({ ...c, hp: newHp, potions: newPotions }))
+    setResult({ label: `Pozione ${p.label}`, rolled, bonus: p.bonus, total, dice: p.dice })
+    setTimeout(() => setResult(null), 4000)
+  }
+
+  return (
+    <Card style={{ marginBottom: 16 }}>
+      <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 12px', color: T.gold, ...headerFont, letterSpacing: '0.06em' }}>🧪 POZIONI CURATIVE</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8, marginBottom: result ? 12 : 0 }}>
+        {POZIONI.map(p => {
+          const qty = potions[p.key] || 0
+          return (
+            <div key={p.key} style={{ background: T.parchmentDark, border: `1px solid ${T.parchmentDarker}`, borderRadius: 6, padding: '8px 10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: p.color, ...headerFont }}>{p.label.toUpperCase()}</span>
+                <span style={{ fontSize: 11, color: T.inkFaint }}>{p.dice}+{p.bonus}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {isOwner && <button onClick={() => updatePotions({ ...potions, [p.key]: Math.max(0, qty - 1) })} style={{ width: 24, height: 24, borderRadius: '50%', border: `1px solid ${T.parchmentDarker}`, background: 'transparent', cursor: 'pointer', fontSize: 14, color: T.inkFaint }}>−</button>}
+                <span style={{ fontSize: 18, fontWeight: 700, color: qty > 0 ? p.color : T.inkFaint, flex: 1, textAlign: 'center' }}>{qty}</span>
+                {isOwner && <button onClick={() => updatePotions({ ...potions, [p.key]: qty + 1 })} style={{ width: 24, height: 24, borderRadius: '50%', border: `1px solid ${T.parchmentDarker}`, background: 'transparent', cursor: 'pointer', fontSize: 14, color: T.inkFaint }}>+</button>}
+              </div>
+              {isOwner && qty > 0 && (
+                <button onClick={() => usaPozione(p)} style={{ width: '100%', marginTop: 6, padding: '4px', background: p.color + '22', border: `1px solid ${p.color}44`, borderRadius: 4, cursor: 'pointer', fontSize: 12, color: p.color, fontWeight: 600 }}>
+                  Usa Pozione
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {result && (
+        <div style={{ background: `linear-gradient(135deg, #e8f0e8, #d8e8d8)`, border: `1.5px solid ${T.green}`, borderRadius: 6, padding: '10px 14px', fontSize: 14, color: T.green }}>
+          <strong>{result.label}</strong>: {result.dice} → {result.rolled} + {result.bonus} = <strong style={{ fontSize: 18 }}>+{result.total} PF</strong>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// ─── Chat Privata ─────────────────────────────────────────────────────────────
+function ChatSection({ profile, players, isDM }) {
+  const [messages, setMessages] = useState([])
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [newMsg, setNewMsg] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [allProfiles, setAllProfiles] = useState([])
+  const msgEndRef = useRef()
+
+  useEffect(() => {
+    supabase.from('profiles').select('*').order('username').then(({ data }) => {
+      setAllProfiles(data || [])
+    })
+  }, [])
+
+  const contacts = allProfiles.filter(p => p.id !== profile.id)
+
+  useEffect(() => {
+    if (!selectedUser) return
+    setLoading(true)
+    supabase.from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${profile.id},recipient_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},recipient_id.eq.${profile.id})`)
+      .order('created_at')
+      .then(({ data }) => { setMessages(data || []); setLoading(false) })
+
+    // Mark as read
+    supabase.from('messages').update({ read: true })
+      .eq('recipient_id', profile.id)
+      .eq('sender_id', selectedUser.id)
+      .eq('read', false)
+      .then(() => {})
+
+    // Realtime
+    const channel = supabase.channel(`chat-${profile.id}-${selectedUser.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        const msg = payload.new
+        if ((msg.sender_id === profile.id && msg.recipient_id === selectedUser.id) ||
+            (msg.sender_id === selectedUser.id && msg.recipient_id === profile.id)) {
+          setMessages(m => [...m, msg])
+          if (msg.recipient_id === profile.id) {
+            supabase.from('messages').update({ read: true }).eq('id', msg.id).then(() => {})
+          }
+        }
+      }).subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [selectedUser])
+
+  useEffect(() => { msgEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  const sendMsg = async () => {
+    if (!newMsg.trim() || !selectedUser) return
+    const msg = { sender_id: profile.id, recipient_id: selectedUser.id, content: newMsg.trim() }
+    setNewMsg('')
+    await supabase.from('messages').insert([msg])
+  }
+
+  const formatTime = (d) => { try { return new Date(d).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+
+  return (
+    <div>
+      <SH title="💬 Messaggi Privati" />
+      <div style={{ display: 'flex', gap: 12, height: 500 }}>
+        {/* Contacts list */}
+        <div style={{ width: 140, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {contacts.map(c => (
+            <button key={c.id} onClick={() => setSelectedUser(c)}
+              style={{ padding: '10px 8px', borderRadius: 6, border: selectedUser?.id === c.id ? `2px solid ${T.gold}` : `1px solid ${T.parchmentDarker}`, background: selectedUser?.id === c.id ? T.gold + '22' : T.parchmentDark, cursor: 'pointer', textAlign: 'left', ...bodyFont }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.player_color || T.gold, flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: T.ink, fontWeight: selectedUser?.id === c.id ? 700 : 400 }}>{c.username}</span>
+              </div>
+              {isDM && <div style={{ fontSize: 10, color: T.inkFaint, marginTop: 2 }}>{c.role === 'dm' ? 'DM' : 'Giocatore'}</div>}
+            </button>
+          ))}
+        </div>
+
+        {/* Chat area */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: `1.5px solid ${T.parchmentDarker}`, borderRadius: 6, overflow: 'hidden' }}>
+          {!selectedUser ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.parchmentDark }}>
+              <p style={{ color: T.inkFaint, fontStyle: 'italic', fontSize: 14 }}>Seleziona un contatto per chattare</p>
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '8px 12px', background: T.parchmentDark, borderBottom: `1px solid ${T.parchmentDarker}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedUser.player_color || T.gold }} />
+                <span style={{ fontWeight: 700, color: T.ink, ...headerFont, fontSize: 14 }}>{selectedUser.username}</span>
+                <span style={{ fontSize: 11, color: T.inkFaint, fontStyle: 'italic' }}>— privato</span>
+              </div>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '12px', background: T.parchment, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {loading && <p style={{ color: T.inkFaint, fontStyle: 'italic', textAlign: 'center' }}>Caricamento...</p>}
+                {messages.map(m => {
+                  const isMe = m.sender_id === profile.id
+                  return (
+                    <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                      <div style={{ maxWidth: '75%', background: isMe ? T.gold + '33' : T.parchmentDark, border: `1px solid ${isMe ? T.gold + '66' : T.parchmentDarker}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '8px 12px' }}>
+                        <p style={{ margin: 0, fontSize: 14, color: T.ink, lineHeight: 1.5 }}>{m.content}</p>
+                        <p style={{ margin: '4px 0 0', fontSize: 10, color: T.inkFaint, textAlign: isMe ? 'right' : 'left' }}>{formatTime(m.created_at)}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div ref={msgEndRef} />
+              </div>
+              <div style={{ padding: '8px', background: T.parchmentDark, borderTop: `1px solid ${T.parchmentDarker}`, display: 'flex', gap: 8 }}>
+                <input value={newMsg} onChange={e => setNewMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMsg()}
+                  placeholder="Scrivi un messaggio..." style={{ flex: 1, padding: '8px 12px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 20, background: T.parchment, fontSize: 14, color: T.ink, outline: 'none' }} />
+                <button onClick={sendMsg} disabled={!newMsg.trim()} style={{ padding: '8px 16px', background: newMsg.trim() ? T.gold : T.parchmentDarker, border: 'none', borderRadius: 20, cursor: newMsg.trim() ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 700, fontSize: 14 }}>→</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -1920,6 +2125,7 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
   const DM_SECTIONS = [
     { id: 'sessioni', label: 'Sessioni', icon: '📜' },
     { id: 'npc', label: 'NPC', icon: '⚔' },
+    { id: 'messaggi', label: 'Messaggi', icon: '💬' },
     { id: 'mappa', label: 'Mappa', icon: '🗺️' },
     { id: 'fazioni', label: 'Fazioni', icon: '⚜' },
     { id: 'lore', label: 'Lore', icon: '📖' },
@@ -2208,7 +2414,7 @@ ${lootEntry.notes}
 
   useEffect(() => { supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => setPlayers(data || [])) }, [])
 
-  const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', note_dm: '🔒 Pergamene Segrete' }
+  const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
   const currentLabel = activeSection.startsWith('player_') ? (players.find(p => p.id === activeSection.replace('player_', ''))?.username || 'Avventuriero') : (LABELS[activeSection] || activeSection)
 
   const renderSection = () => {
@@ -2222,6 +2428,7 @@ ${lootEntry.notes}
     if (activeSection === 'party') return <SharedSection />
     if (activeSection === 'dadi') return <DiceSection />
     if (activeSection === 'note_dm' && isDM) return <DMNotesSection />
+    if (activeSection === 'messaggi') return <ChatSection profile={profile} players={players} isDM={isDM} />
     if (activeSection.startsWith('player_')) {
       const pid = activeSection.replace('player_', '')
       const player = players.find(p => p.id === pid)
