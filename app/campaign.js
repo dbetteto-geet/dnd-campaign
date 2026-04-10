@@ -4,22 +4,7 @@ import { supabase } from '../lib/supabase'
 
 
 // ─── Rich Text Editor ─────────────────────────────────────────────────────────
-function useInsertMd(value, onChange) {
-  const ref = useRef()
-  const insert = (before, after = '', placeholder = '') => {
-    const el = ref.current; if (!el) return
-    const s = el.selectionStart, e = el.selectionEnd
-    const sel = (value || '').substring(s, e) || placeholder
-    const newVal = (value || '').substring(0, s) + before + sel + after + (value || '').substring(e)
-    onChange(newVal)
-    setTimeout(() => {
-      el.selectionStart = s + before.length
-      el.selectionEnd = s + before.length + sel.length
-      el.focus()
-    }, 0)
-  }
-  return { ref, insert }
-}
+// useInsertMd removed - logic moved into RichEditor directly
 
 function renderMd(text) {
   if (!text) return ''
@@ -44,7 +29,22 @@ function RichText({ value, style }) {
 }
 
 function RichEditor({ value, onChange, placeholder, height }) {
-  const { ref: taRef, insert } = useInsertMd(value, onChange)
+  const taRef = useRef()
+  const insert = (before, after = '', placeholder2 = '') => {
+    const el = taRef.current
+    if (!el) { onChange((value || '') + before + placeholder2 + after); return }
+    const s = el.selectionStart, e = el.selectionEnd
+    const sel = (value || '').substring(s, e) || placeholder2
+    const newVal = (value || '').substring(0, s) + before + sel + after + (value || '').substring(e)
+    onChange(newVal)
+    setTimeout(() => {
+      if (el) {
+        el.selectionStart = s + before.length
+        el.selectionEnd = s + before.length + sel.length
+        el.focus()
+      }
+    }, 0)
+  }
   const [preview, setPreview] = useState(false)
   const [showLink, setShowLink] = useState(false)
   const [showImg, setShowImg] = useState(false)
@@ -102,7 +102,7 @@ function RichEditor({ value, onChange, placeholder, height }) {
       </div>
       {preview
         ? <div style={{ padding: '12px 14px', minHeight: height || 200, background: '#f4e4c1', fontSize: 15, lineHeight: 1.8, color: '#5c3d2e', fontFamily: "'Crimson Text', Georgia, serif" }} dangerouslySetInnerHTML={{ __html: renderMd(value) || '<span style="color:#8b6355;font-style:italic">Nessun contenuto...</span>' }} />
-        : <textarea ref={taRef} value={value || ''} onChange={handleChange} placeholder={placeholder || 'Scrivi qui...'} style={{ width: '100%', boxSizing: 'border-box', minHeight: height || 200, padding: '12px 14px', background: '#f4e4c1', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.8, resize: 'vertical', color: '#2c1810', fontFamily: "'Crimson Text', Georgia, serif" }} />
+        : <textarea ref={taRef} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder || 'Scrivi qui...'} style={{ width: '100%', boxSizing: 'border-box', minHeight: height || 200, padding: '12px 14px', background: '#f4e4c1', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.8, resize: 'vertical', color: '#2c1810', fontFamily: "'Crimson Text', Georgia, serif" }} />
       }
       {showLink && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2125,7 +2125,6 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
   const DM_SECTIONS = [
     { id: 'sessioni', label: 'Sessioni', icon: '📜' },
     { id: 'npc', label: 'NPC', icon: '⚔' },
-    { id: 'messaggi', label: 'Messaggi', icon: '💬' },
     { id: 'mappa', label: 'Mappa', icon: '🗺️' },
     { id: 'fazioni', label: 'Fazioni', icon: '⚜' },
     { id: 'lore', label: 'Lore', icon: '📖' },
@@ -2135,6 +2134,7 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
     { id: 'dadi', label: 'Tira Dadi', icon: '🎲' },
   ]
   const DM_ONLY = [{ id: 'note_dm', label: 'Pergamene Segrete', icon: '🔒' }]
+  const BOTTOM_SECTIONS = [{ id: 'messaggi', label: 'Messaggi', icon: '💬' }]
   const playerSections = isDM ? players : players.filter(p => p.id === profile?.id)
   const handleNav = (id) => { setActiveSection(id); onClose() }
   const isActive = (id) => activeSection === id
@@ -2167,6 +2167,9 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
             <div style={{ fontSize: 10, color: T.goldLight, padding: '0 0.75rem', marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'Cinzel', Georgia, serif" }}>SEGRETI</div>
             {DM_ONLY.map(s => <button key={s.id} onClick={() => handleNav(s.id)} style={btnStyle(s.id)}><span style={{ fontSize: 16 }}>{s.icon}</span>{s.label}</button>)}
           </>}
+          <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
+          <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
+          {BOTTOM_SECTIONS.map(s => <button key={s.id} onClick={() => handleNav(s.id)} style={btnStyle(s.id)}><span style={{ fontSize: 16 }}>{s.icon}</span>{s.label}</button>)}
           <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
           <div style={{ fontSize: 10, color: T.goldLight, padding: '0 0.75rem', marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'Cinzel', Georgia, serif" }}>LA COMPAGNIA</div>
           {playerSections.map(p => <button key={p.id} onClick={() => handleNav('player_' + p.id)} style={btnStyle('player_' + p.id)}><span style={{ width: 10, height: 10, borderRadius: '50%', background: p.player_color || T.gold, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 4px ${p.player_color || T.gold}88` }} />{p.username}</button>)}
