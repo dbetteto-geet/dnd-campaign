@@ -31,12 +31,15 @@ function RichText({ value, style }) {
 function RichEditor({ value, onChange, placeholder, height }) {
   const safeValue = value == null ? '' : String(value)
   const taRef = useRef()
+  const valueRef = useRef(safeValue)
+  valueRef.current = safeValue
   const insert = (before, after = '', placeholder2 = '') => {
     const el = taRef.current
-    if (!el) { onChange(safeValue + before + placeholder2 + after); return }
+    const cur = valueRef.current
+    if (!el) { onChange(cur + before + placeholder2 + after); return }
     const s = el.selectionStart, e = el.selectionEnd
-    const sel = safeValue.substring(s, e) || placeholder2
-    const newVal = safeValue.substring(0, s) + before + sel + after + safeValue.substring(e)
+    const sel = cur.substring(s, e) || placeholder2
+    const newVal = cur.substring(0, s) + before + sel + after + cur.substring(e)
     onChange(newVal)
     setTimeout(() => {
       if (el) {
@@ -1662,21 +1665,17 @@ function PotionsPanel({ character, isOwner, onUpdate }) {
 }
 
 // ─── Chat Privata ─────────────────────────────────────────────────────────────
-function ChatSection({ profile, players, isDM }) {
+function ChatSection({ profile, players, isDM, allContacts }) {
   const [messages, setMessages] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [newMsg, setNewMsg] = useState('')
   const [loading, setLoading] = useState(false)
-  const [allProfiles, setAllProfiles] = useState(players || [])
+
   const [unread, setUnread] = useState({}) // { userId: count }
   const msgEndRef = useRef()
   const inputRef = useRef()
 
   useEffect(() => {
-    // Load DM profiles to add to contacts
-    supabase.from('profiles').select('*').eq('role', 'dm').then(({ data }) => {
-      if (data) setAllProfiles(prev => [...(players || []), ...data])
-    })
     // Load unread counts
     supabase.from('messages').select('sender_id').eq('recipient_id', profile.id).eq('read', false)
       .then(({ data }) => {
@@ -1686,12 +1685,9 @@ function ChatSection({ profile, players, isDM }) {
       })
   }, [])
 
-  // Use players passed from parent - always available, no RLS issue
-  // DM sees all players; players see DM + all other players
-  const contactMap = {}
-  ;allProfiles.forEach(p => { if (p.id !== profile.id) contactMap[p.id] = p })
-  ;(players || []).forEach(p => { if (p.id !== profile.id) contactMap[p.id] = p })
-  const contacts = Object.values(contactMap)
+  // allContacts comes from App: all players + all DM profiles, already loaded
+  // Filter out self
+  const contacts = (allContacts || []).filter(p => p.id !== profile.id)
 
   useEffect(() => {
     if (!selectedUser) return
@@ -1911,7 +1907,7 @@ function SharedSection({ isDM }) {
       )}
       {activeTab === 'quest' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 700, fontSize: 18, color: T.red, ...headerFont }}>📋 Missioni</span>{isDM && <BtnP onClick={openAddQuest}>+ Nuova</BtnP>}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 700, fontSize: 18, color: T.red, ...headerFont }}>📋 Missioni</span><BtnP onClick={openAddQuest}>+ Nuova</BtnP></div>
           {quests.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessuna missione in corso...</p>}
           {quests.map(q => <Card key={q.id} style={{ marginBottom: 10 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}><span style={{ fontWeight: 600, flex: 1, color: T.ink, fontSize: 16, ...headerFont }}>{q.title}</span><div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}><Badge color={QUEST_STATUS_COLORS[q.status] || T.inkFaint}>{q.status}</Badge><button onClick={() => openEditQuest(q)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>✏️</button>{isDM && <button onClick={() => removeQuest(q.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button>}</div></div><p style={{ margin: '6px 0', fontSize: 15, color: T.inkLight, lineHeight: 1.6 }}>{q.description}</p>{q.reward && <div style={{ fontSize: 13, color: T.gold, fontStyle: 'italic' }}>⚜️ Ricompensa: {q.reward}</div>}</Card>)}
           {showQuestModal && <Modal title={editingQuest ? 'Modifica Missione' : 'Nuova Missione'} onClose={() => setShowQuestModal(false)}><FF label="Titolo"><Input value={questForm.title} onChange={e => setQuestForm({ ...questForm, title: e.target.value })} /></FF><FF label="Stato"><Sel value={questForm.status} onChange={e => setQuestForm({ ...questForm, status: e.target.value })}>{Object.keys(QUEST_STATUS_COLORS).map(s => <option key={s}>{s}</option>)}</Sel></FF><FF label="Descrizione"><Textarea value={questForm.description} onChange={e => setQuestForm({ ...questForm, description: e.target.value })} /></FF><FF label="Ricompensa"><Input value={questForm.reward} onChange={e => setQuestForm({ ...questForm, reward: e.target.value })} /></FF><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowQuestModal(false)}>Annulla</BtnS><BtnP onClick={saveQuest}>Salva</BtnP></div></Modal>}
@@ -2478,7 +2474,11 @@ ${lootEntry.notes}
     setExporting(false)
   }
 
-  useEffect(() => { supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => setPlayers(data || [])) }, [])
+  const [allContacts, setAllContacts] = useState([])
+  useEffect(() => {
+    supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => setPlayers(data || []))
+    supabase.from('profiles').select('*').order('username').then(({ data }) => setAllContacts(data || []))
+  }, [])
 
   const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
   const currentLabel = activeSection.startsWith('player_') ? (players.find(p => p.id === activeSection.replace('player_', ''))?.username || 'Avventuriero') : (LABELS[activeSection] || activeSection)
@@ -2494,7 +2494,7 @@ ${lootEntry.notes}
     if (activeSection === 'party') return <SharedSection isDM={isDM} />
     if (activeSection === 'dadi') return <DiceSection />
     if (activeSection === 'note_dm' && isDM) return <DMNotesSection />
-    if (activeSection === 'messaggi') return <ChatSection profile={profile} players={players} isDM={isDM} />
+    if (activeSection === 'messaggi') return <ChatSection profile={profile} players={players} isDM={isDM} allContacts={allContacts} />
     if (activeSection.startsWith('player_')) {
       const pid = activeSection.replace('player_', '')
       const player = players.find(p => p.id === pid)
