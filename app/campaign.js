@@ -29,26 +29,9 @@ function RichText({ value, style }) {
 }
 
 function RichEditor({ value, onChange, placeholder, height }) {
-  const safeValue = value == null ? '' : String(value)
   const taRef = useRef()
-  const valueRef = useRef(safeValue)
-  valueRef.current = safeValue
-  const insert = (before, after = '', placeholder2 = '') => {
-    const el = taRef.current
-    const cur = valueRef.current
-    if (!el) { onChange(cur + before + placeholder2 + after); return }
-    const s = el.selectionStart, e = el.selectionEnd
-    const sel = cur.substring(s, e) || placeholder2
-    const newVal = cur.substring(0, s) + before + sel + after + cur.substring(e)
-    onChange(newVal)
-    setTimeout(() => {
-      if (el) {
-        el.selectionStart = s + before.length
-        el.selectionEnd = s + before.length + sel.length
-        el.focus()
-      }
-    }, 0)
-  }
+  const valRef = useRef('')
+  valRef.current = value == null ? '' : String(value)
   const [preview, setPreview] = useState(false)
   const [showLink, setShowLink] = useState(false)
   const [showImg, setShowImg] = useState(false)
@@ -59,61 +42,76 @@ function RichEditor({ value, onChange, placeholder, height }) {
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef()
 
-  const TB = ({ label, action, title }) => (
-    <button type="button" title={title} onClick={action} style={{ background: 'none', border: `1px solid #d4b896`, borderRadius: 3, padding: '3px 7px', fontSize: 13, cursor: 'pointer', color: '#5c3d2e', minWidth: 28, minHeight: 28 }}>{label}</button>
-  )
+  const ins = (before, after, ph) => {
+    const el = taRef.current
+    const cur = valRef.current
+    if (!el) { onChange(cur + before + (ph || '') + (after || '')); return }
+    const s = el.selectionStart
+    const e = el.selectionEnd
+    const sel = cur.substring(s, e) || (ph || '')
+    const next = cur.substring(0, s) + before + sel + (after || '') + cur.substring(e)
+    onChange(next)
+    requestAnimationFrame(() => {
+      if (!taRef.current) return
+      taRef.current.selectionStart = s + before.length
+      taRef.current.selectionEnd = s + before.length + sel.length
+      taRef.current.focus()
+    })
+  }
+
   const insertLink = () => {
     if (!linkUrl) return
-    const md = `[${linkText || linkUrl}](${linkUrl})`
-    onChange(safeValue + md)
+    ins('[' + (linkText || linkUrl) + '](' + linkUrl + ')', '', '')
     setShowLink(false); setLinkUrl(''); setLinkText('')
   }
   const insertImg = () => {
     if (!imgUrl) return
-    const md = `\n![${imgAlt || 'immagine'}](${imgUrl})\n`
-    onChange(safeValue + md)
+    ins('\n![' + (imgAlt || 'immagine') + '](' + imgUrl + ')\n', '', '')
     setShowImg(false); setImgUrl(''); setImgAlt('')
   }
   const uploadImg = async (e) => {
     const file = e.target.files[0]; if (!file) return
     setUploading(true)
     const ext = file.name.split('.').pop()
-    const path = `content/${Date.now()}.${ext}`
+    const path = 'content/' + Date.now() + '.' + ext
     const { error } = await supabase.storage.from('content-images').upload(path, file)
-    if (!error) {
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/content-images/${path}`
-      setImgUrl(url)
-    }
+    if (!error) setImgUrl(process.env.NEXT_PUBLIC_SUPABASE_URL + '/storage/v1/object/public/content-images/' + path)
     setUploading(false)
   }
 
+  const tb = { background: 'none', border: '1px solid #d4b896', borderRadius: 3, padding: '3px 8px', fontSize: 13, cursor: 'pointer', color: '#5c3d2e', minWidth: 28, minHeight: 30 }
+  const cur = valRef.current
+
   return (
-    <div style={{ border: `1.5px solid #d4b896`, borderRadius: 6, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', gap: 3, padding: '5px 8px', background: '#e8d5a3', borderBottom: `1px solid #d4b896`, flexWrap: 'wrap', alignItems: 'center' }}>
-        <TB label={<strong>G</strong>} action={() => insertMd(taRef, '**', '**', 'grassetto')} title="Grassetto" />
-        <TB label={<em>C</em>} action={() => insertMd(taRef, '*', '*', 'corsivo')} title="Corsivo" />
-        <TB label="H1" action={() => insertMd(taRef, '# ', '', 'Titolo')} title="Titolo grande" />
-        <TB label="H2" action={() => insertMd(taRef, '## ', '', 'Titolo')} title="Titolo medio" />
-        <TB label="H3" action={() => insertMd(taRef, '### ', '', 'Titolo')} title="Titolo piccolo" />
-        <TB label="• —" action={() => insertMd(taRef, '\n- ', '', 'elemento')} title="Elenco puntato" />
-        <TB label="1. —" action={() => insertMd(taRef, '\n1. ', '', 'elemento')} title="Elenco numerato" />
-        <TB label="🔗" action={() => setShowLink(true)} title="Inserisci link" />
-        <TB label="🖼" action={() => setShowImg(true)} title="Inserisci immagine" />
+    <div style={{ border: '1.5px solid #d4b896', borderRadius: 6, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', gap: 3, padding: '5px 8px', background: '#e8d5a3', borderBottom: '1px solid #d4b896', flexWrap: 'wrap', alignItems: 'center' }}>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); ins('**', '**', 'grassetto') }}><strong>G</strong></button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); ins('*', '*', 'corsivo') }}><em>C</em></button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); ins('# ', '', 'Titolo') }}>H1</button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); ins('## ', '', 'Titolo') }}>H2</button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); ins('### ', '', 'Titolo') }}>H3</button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); ins('\n- ', '', 'elemento') }}>{'• —'}</button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); ins('\n1. ', '', 'elemento') }}>{'1. —'}</button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); setShowLink(true) }}>🔗</button>
+        <button type="button" style={tb} onMouseDown={e => { e.preventDefault(); setShowImg(true) }}>🖼</button>
         <div style={{ flex: 1 }} />
-        <button type="button" onClick={() => setPreview(p => !p)} style={{ background: preview ? '#8b6914' : 'transparent', border: `1px solid #8b6914`, borderRadius: 3, padding: '3px 10px', fontSize: 12, cursor: 'pointer', color: preview ? '#fff' : '#8b6914', fontWeight: 600 }}>
+        <button type="button" onClick={() => setPreview(p => !p)}
+          style={{ ...tb, background: preview ? '#8b6914' : 'transparent', border: '1px solid #8b6914', color: preview ? '#fff' : '#8b6914', fontWeight: 600, padding: '3px 10px' }}>
           {preview ? '✏️ Modifica' : '👁 Anteprima'}
         </button>
       </div>
       {preview
-        ? <div style={{ padding: '12px 14px', minHeight: height || 200, background: '#f4e4c1', fontSize: 15, lineHeight: 1.8, color: '#5c3d2e', fontFamily: "'Crimson Text', Georgia, serif" }} dangerouslySetInnerHTML={{ __html: renderMd(safeValue) || '<span style="color:#8b6355;font-style:italic">Nessun contenuto...</span>' }} />
-        : <textarea ref={taRef} value={safeValue} onChange={e => onChange(e.target.value)} placeholder={placeholder || 'Scrivi qui...'} style={{ width: '100%', boxSizing: 'border-box', minHeight: height || 200, padding: '12px 14px', background: '#f4e4c1', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.8, resize: 'vertical', color: '#2c1810', fontFamily: "'Crimson Text', Georgia, serif" }} />
+        ? <div style={{ padding: '12px 14px', minHeight: height || 200, background: '#f4e4c1', fontSize: 15, lineHeight: 1.8, color: '#5c3d2e', fontFamily: "'Crimson Text', Georgia, serif" }}
+            dangerouslySetInnerHTML={{ __html: renderMd(cur) || '<span style="color:#8b6355;font-style:italic">Nessun contenuto...</span>' }} />
+        : <textarea ref={taRef} value={cur} onChange={e => onChange(e.target.value)} placeholder={placeholder || 'Scrivi qui...'}
+            style={{ width: '100%', boxSizing: 'border-box', minHeight: height || 200, padding: '12px 14px', background: '#f4e4c1', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.8, resize: 'vertical', color: '#2c1810', fontFamily: "'Crimson Text', Georgia, serif", display: 'block' }} />
       }
       {showLink && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#f4e4c1', borderRadius: 8, padding: '1.5rem', width: '90%', maxWidth: 400, border: '2px solid #8b6914' }}>
             <h3 style={{ margin: '0 0 16px', color: '#8b1a1a', fontFamily: "'Cinzel', Georgia, serif" }}>Inserisci Link</h3>
-            <div style={{ marginBottom: 12 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4, fontFamily: "'Cinzel', Georgia, serif" }}>TESTO</label><input value={linkText} onChange={e => setLinkText(e.target.value)} placeholder="Testo del link" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
-            <div style={{ marginBottom: 16 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4, fontFamily: "'Cinzel', Georgia, serif" }}>URL</label><input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ marginBottom: 12 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4 }}>TESTO</label><input value={linkText} onChange={e => setLinkText(e.target.value)} placeholder="Testo del link" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ marginBottom: 16 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4 }}>URL</label><input value={linkUrl} onChange={e => setLinkUrl(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowLink(false); setLinkUrl(''); setLinkText('') }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #d4b896', borderRadius: 4, cursor: 'pointer', color: '#8b6355' }}>Annulla</button>
               <button onClick={insertLink} style={{ padding: '8px 16px', background: '#8b6914', border: 'none', borderRadius: 4, cursor: 'pointer', color: '#fff', fontWeight: 600 }}>Inserisci</button>
@@ -131,13 +129,13 @@ function RichEditor({ value, onChange, placeholder, height }) {
                 {uploading ? '⏳ Caricamento...' : '📁 Scegli file'}
                 <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }} disabled={uploading} onChange={uploadImg} />
               </label>
-              {imgUrl && <p style={{ fontSize: 12, color: '#1a5c2e', margin: '8px 0 0' }}>✓ Pronta da inserire</p>}
+              {imgUrl && <p style={{ fontSize: 12, color: '#1a5c2e', margin: '8px 0 0' }}>✓ Pronta</p>}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <div style={{ flex: 1, height: 1, background: '#d4b896' }} /><span style={{ fontSize: 12, color: '#8b6355' }}>oppure da URL</span><div style={{ flex: 1, height: 1, background: '#d4b896' }} />
             </div>
-            <div style={{ marginBottom: 12 }}><input value={imgUrl.startsWith('http') && !imgUrl.includes('content-images') ? imgUrl : imgUrl.includes('content-images') ? '' : imgUrl} onChange={e => setImgUrl(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
-            <div style={{ marginBottom: 16 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4, fontFamily: "'Cinzel', Georgia, serif" }}>TESTO ALTERNATIVO</label><input value={imgAlt} onChange={e => setImgAlt(e.target.value)} placeholder="Descrizione immagine" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ marginBottom: 12 }}><input value={imgUrl.includes('content-images') ? '' : imgUrl} onChange={e => setImgUrl(e.target.value)} placeholder="https://..." style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
+            <div style={{ marginBottom: 16 }}><label style={{ display: 'block', fontSize: 12, color: '#8b6914', marginBottom: 4 }}>TESTO ALTERNATIVO</label><input value={imgAlt} onChange={e => setImgAlt(e.target.value)} placeholder="Descrizione immagine" style={{ width: '100%', boxSizing: 'border-box', padding: '8px 10px', border: '1px solid #d4b896', borderRadius: 4, fontSize: 15, background: '#e8d5a3', color: '#2c1810' }} /></div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowImg(false); setImgUrl(''); setImgAlt('') }} style={{ padding: '8px 16px', background: 'transparent', border: '1px solid #d4b896', borderRadius: 4, cursor: 'pointer', color: '#8b6355' }}>Annulla</button>
               <button onClick={insertImg} disabled={!imgUrl} style={{ padding: '8px 16px', background: imgUrl ? '#8b6914' : '#d4b896', border: 'none', borderRadius: 4, cursor: imgUrl ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 600 }}>Inserisci</button>
@@ -148,6 +146,8 @@ function RichEditor({ value, onChange, placeholder, height }) {
     </div>
   )
 }
+
+
 
 const T = {
   parchment: '#f4e4c1', parchmentDark: '#e8d5a3', parchmentDarker: '#d4b896',
@@ -1029,26 +1029,38 @@ function DMNotesSection() {
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [noteId, setNoteId] = useState(null)
+  const noteRef = useRef('')
 
-  useEffect(() => { supabase.from('dm_notes').select('*').limit(1).maybeSingle().then(({ data }) => { if (data) { setNoteText(data.content || ''); setNoteId(data.id) } setLoading(false) }) }, [])
+  useEffect(() => {
+    supabase.from('dm_notes').select('*').limit(1).maybeSingle().then(({ data }) => {
+      if (data) { setNoteText(data.content || ''); noteRef.current = data.content || ''; setNoteId(data.id) }
+      setLoading(false)
+    })
+  }, [])
 
   const save = async () => {
-    if (noteId) { await supabase.from('dm_notes').update({ content: noteText, updated_at: new Date().toISOString() }).eq('id', noteId) }
-    else { const { data } = await supabase.from('dm_notes').insert([{ content: noteText }]).select(); if (data) setNoteId(data[0].id) }
+    const textToSave = noteRef.current
+    if (noteId) { await supabase.from('dm_notes').update({ content: textToSave, updated_at: new Date().toISOString() }).eq('id', noteId) }
+    else { const { data } = await supabase.from('dm_notes').insert([{ content: textToSave }]).select(); if (data) setNoteId(data[0].id) }
     setEditing(false)
   }
+
+  const handleChange = (val) => { setNoteText(val); noteRef.current = val }
 
   if (loading) return <p style={{ color: T.inkFaint }}>Caricamento...</p>
   return (
     <div>
       <SH title="🔒 Pergamene Segrete del DM" action={editing ? <BtnP onClick={save}>Sigilla</BtnP> : <BtnS onClick={() => setEditing(true)}>Scrivi</BtnS>} />
       <Card style={{ background: `linear-gradient(135deg, #fff8e8, #f8edd8)`, border: `1.5px solid ${T.goldLight}` }}>
-        {editing ? <div><NotePhotoScanner onTranscribed={text => setNoteText(c => c ? c + '\n\n' + text : text)} /><textarea value={noteText} onChange={e => setNoteText(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 200, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, lineHeight: 1.8, resize: 'vertical', color: T.ink, fontFamily: "'Crimson Text', Georgia, serif" }} /></div>
+        {editing
+          ? <div><NotePhotoScanner onTranscribed={text => { const v = noteRef.current + (noteRef.current ? '\n\n' : '') + text; setNoteText(v); noteRef.current = v }} /><textarea value={noteText} onChange={e => handleChange(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', minHeight: 200, background: 'transparent', border: 'none', outline: 'none', fontSize: 16, lineHeight: 1.8, resize: 'vertical', color: T.ink, fontFamily: "'Crimson Text', Georgia, serif" }} /></div>
           : <pre style={{ margin: 0, fontFamily: "'Crimson Text', Georgia, serif", fontSize: 16, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: T.inkLight, fontStyle: 'italic' }}>{noteText || 'Nessuna pergamena segreta...'}</pre>}
       </Card>
     </div>
   )
 }
+
+
 
 // ─── SheetScanner ─────────────────────────────────────────────────────────────
 function SheetScanner({ onParsed }) {
@@ -1665,19 +1677,25 @@ function PotionsPanel({ character, isOwner, onUpdate }) {
 }
 
 // ─── Chat Privata ─────────────────────────────────────────────────────────────
-function ChatSection({ profile, players, isDM, allContacts, onMessagesRead }) {
+function ChatSection({ profile, players, isDM, allContacts }) {
   const [messages, setMessages] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [newMsg, setNewMsg] = useState('')
   const [loading, setLoading] = useState(false)
-
-  const [unread, setUnread] = useState({}) // { userId: count }
+  const [unread, setUnread] = useState({})
   const msgEndRef = useRef()
   const inputRef = useRef()
+  const selectedUserRef = useRef(null)
+  const channelRef = useRef(null)
 
+  const contacts = (allContacts || []).filter(p => p.id !== profile.id)
+
+  // Load initial unread counts
   useEffect(() => {
-    // Load unread counts
-    supabase.from('messages').select('sender_id').eq('recipient_id', profile.id).eq('read', false)
+    supabase.from('messages')
+      .select('sender_id')
+      .eq('recipient_id', profile.id)
+      .eq('read', false)
       .then(({ data }) => {
         const counts = {}
         ;(data || []).forEach(m => { counts[m.sender_id] = (counts[m.sender_id] || 0) + 1 })
@@ -1685,62 +1703,54 @@ function ChatSection({ profile, players, isDM, allContacts, onMessagesRead }) {
       })
   }, [])
 
-  // allContacts comes from App: all players + all DM profiles, already loaded
-  // Filter out self
-  const contacts = (allContacts || []).filter(p => p.id !== profile.id)
-
-  useEffect(() => {
-    if (!selectedUser) return
+  const openConversation = async (user) => {
+    setSelectedUser(user)
+    selectedUserRef.current = user
     setLoading(true)
-    supabase.from('messages')
-      .select('*')
-      .or(`and(sender_id.eq.${profile.id},recipient_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},recipient_id.eq.${profile.id})`)
-      .order('created_at')
-      .then(({ data }) => {
-        setMessages(data || [])
-        setLoading(false)
-        // Mark as read
-        supabase.from('messages').select('id').eq('recipient_id', profile.id)
-          .eq('sender_id', selectedUser.id).eq('read', false).then(({ data }) => {
-            if (data && data.length > 0) {
-              supabase.from('messages').update({ read: true })
-                .eq('recipient_id', profile.id).eq('sender_id', selectedUser.id).eq('read', false).then(() => {})
-              onMessagesRead && onMessagesRead(data.length)
-            }
-          })
-        setUnread(u => ({ ...u, [selectedUser.id]: 0 }))
-      })
+    setMessages([])
 
-    // Realtime
-    const channel = supabase.channel(`chat_${[profile.id, selectedUser.id].sort().join('_')}`)
+    // Cleanup old channel
+    if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null }
+
+    // Load messages
+    const { data } = await supabase.from('messages')
+      .select('*')
+      .or(`and(sender_id.eq.${profile.id},recipient_id.eq.${user.id}),and(sender_id.eq.${user.id},recipient_id.eq.${profile.id})`)
+      .order('created_at')
+    setMessages(data || [])
+    setLoading(false)
+
+    // Mark received as read
+    await supabase.from('messages').update({ read: true })
+      .eq('recipient_id', profile.id).eq('sender_id', user.id).eq('read', false)
+    setUnread(u => ({ ...u, [user.id]: 0 }))
+
+    // Subscribe to new messages for this conversation
+    const ch = supabase.channel('chat_' + [profile.id, user.id].sort().join('_'))
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const msg = payload.new
-        const mine = msg.sender_id === profile.id && msg.recipient_id === selectedUser.id
-        const theirs = msg.sender_id === selectedUser.id && msg.recipient_id === profile.id
+        const su = selectedUserRef.current
+        if (!su) return
+        const mine = msg.sender_id === profile.id && msg.recipient_id === su.id
+        const theirs = msg.sender_id === su.id && msg.recipient_id === profile.id
         if (mine || theirs) {
-          setMessages(m => {
-            // Avoid duplicates (optimistic update already added it)
-            if (m.find(x => x.id === msg.id)) return m
-            return [...m, msg]
-          })
+          setMessages(prev => prev.find(x => x.id === msg.id) ? prev : [...prev, msg])
           if (theirs) {
             supabase.from('messages').update({ read: true }).eq('id', msg.id).then(() => {})
           }
-        }
-      }).subscribe()
-
-    // Listen for new messages from anyone (for unread badge)
-    const globalChannel = supabase.channel(`unread_${profile.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages',
-        filter: `recipient_id=eq.${profile.id}` }, (payload) => {
-        const msg = payload.new
-        if (msg.sender_id !== selectedUser?.id) {
+        } else if (msg.recipient_id === profile.id) {
+          // Message from someone else - update unread badge
           setUnread(u => ({ ...u, [msg.sender_id]: (u[msg.sender_id] || 0) + 1 }))
         }
-      }).subscribe()
+      })
+      .subscribe()
+    channelRef.current = ch
+  }
 
-    return () => { supabase.removeChannel(channel); supabase.removeChannel(globalChannel) }
-  }, [selectedUser?.id])
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
+  }, [])
 
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1750,78 +1760,75 @@ function ChatSection({ profile, players, isDM, allContacts, onMessagesRead }) {
     if (!newMsg.trim() || !selectedUser) return
     const text = newMsg.trim()
     setNewMsg('')
-    // Optimistic update
-    const tempMsg = { id: `temp_${Date.now()}`, sender_id: profile.id, recipient_id: selectedUser.id, content: text, created_at: new Date().toISOString(), read: false }
-    setMessages(m => [...m, tempMsg])
-    await supabase.from('messages').insert([{ sender_id: profile.id, recipient_id: selectedUser.id, content: text }])
+    const tempId = 'temp_' + Date.now()
+    const tempMsg = { id: tempId, sender_id: profile.id, recipient_id: selectedUser.id, content: text, created_at: new Date().toISOString(), read: false }
+    setMessages(prev => [...prev, tempMsg])
+    const { data } = await supabase.from('messages').insert([{ sender_id: profile.id, recipient_id: selectedUser.id, content: text }]).select()
+    if (data && data[0]) {
+      // Replace temp message with real one
+      setMessages(prev => prev.map(m => m.id === tempId ? data[0] : m))
+    }
     inputRef.current?.focus()
   }
 
   const fmt = (d) => { try { return new Date(d).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
-  const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <SH title="💬 Messaggi Privati" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* Contact list - horizontal on mobile */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {contacts.map(c => {
-            const u = unread[c.id] || 0
-            return (
-              <button key={c.id} onClick={() => setSelectedUser(c)}
-                style={{ padding: '8px 14px', borderRadius: 20, border: selectedUser?.id === c.id ? `2px solid ${T.gold}` : `1px solid ${T.parchmentDarker}`, background: selectedUser?.id === c.id ? T.gold + '22' : T.parchmentDark, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.player_color || T.gold, flexShrink: 0 }} />
-                <span style={{ fontSize: 14, color: T.ink, fontWeight: selectedUser?.id === c.id ? 700 : 400, ...bodyFont }}>{c.username}</span>
-                {u > 0 && <span style={{ background: T.red, color: '#fff', borderRadius: '50%', minWidth: 18, height: 18, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px' }}>{u}</span>}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Chat area */}
-        {!selectedUser ? (
-          <Card><p style={{ color: T.inkFaint, fontStyle: 'italic', textAlign: 'center', margin: 0 }}>Seleziona un contatto per iniziare a chattare in privato</p></Card>
-        ) : (
-          <div style={{ border: `1.5px solid ${T.parchmentDarker}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            {/* Header */}
-            <div style={{ padding: '10px 14px', background: T.parchmentDark, borderBottom: `1px solid ${T.parchmentDarker}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedUser.player_color || T.gold }} />
-              <span style={{ fontWeight: 700, color: T.ink, ...headerFont, fontSize: 14 }}>{selectedUser.username}</span>
-              <span style={{ fontSize: 11, color: T.inkFaint, fontStyle: 'italic' }}>— conversazione privata</span>
-            </div>
-            {/* Messages */}
-            <div style={{ height: 320, overflowY: 'auto', padding: '12px', background: T.parchment, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {loading && <p style={{ color: T.inkFaint, textAlign: 'center', fontStyle: 'italic' }}>Caricamento...</p>}
-              {!loading && messages.length === 0 && <p style={{ color: T.inkFaint, textAlign: 'center', fontStyle: 'italic' }}>Nessun messaggio ancora. Scrivi il primo!</p>}
-              {messages.map(m => {
-                const isMe = m.sender_id === profile.id
-                return (
-                  <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
-                    <div style={{ maxWidth: '80%', background: isMe ? T.gold + '33' : T.parchmentDark, border: `1px solid ${isMe ? T.gold + '66' : T.parchmentDarker}`, borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '8px 12px' }}>
-                      <p style={{ margin: 0, fontSize: 15, color: T.ink, lineHeight: 1.5, wordBreak: 'break-word' }}>{m.content}</p>
-                      <p style={{ margin: '3px 0 0', fontSize: 10, color: T.inkFaint, textAlign: isMe ? 'right' : 'left' }}>{fmt(m.created_at)}</p>
-                    </div>
-                  </div>
-                )
-              })}
-              <div ref={msgEndRef} />
-            </div>
-            {/* Input */}
-            <div style={{ padding: '8px 10px', background: T.parchmentDark, borderTop: `1px solid ${T.parchmentDarker}`, display: 'flex', gap: 8, alignItems: 'center' }}>
-              <input ref={inputRef} value={newMsg} onChange={e => setNewMsg(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
-                placeholder={`Messaggio a ${selectedUser.username}...`}
-                style={{ flex: 1, padding: '10px 14px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 20, background: T.parchment, fontSize: 14, color: T.ink, outline: 'none', minWidth: 0 }} />
-              <button onClick={sendMsg} disabled={!newMsg.trim()}
-                style={{ width: 40, height: 40, borderRadius: '50%', background: newMsg.trim() ? T.gold : T.parchmentDarker, border: 'none', cursor: newMsg.trim() ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 700, fontSize: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>→</button>
-            </div>
-          </div>
-        )}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {contacts.map(c => {
+          const u = unread[c.id] || 0
+          return (
+            <button key={c.id} onClick={() => openConversation(c)}
+              style={{ padding: '8px 14px', borderRadius: 20, border: selectedUser?.id === c.id ? `2px solid ${T.gold}` : `1px solid ${T.parchmentDarker}`, background: selectedUser?.id === c.id ? T.gold + '22' : T.parchmentDark, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.player_color || T.gold, flexShrink: 0 }} />
+              <span style={{ fontSize: 14, color: T.ink, fontWeight: selectedUser?.id === c.id ? 700 : 400, fontFamily: "'Crimson Text', Georgia, serif" }}>{c.username}</span>
+              {u > 0 && <span style={{ background: T.red, color: '#fff', borderRadius: 10, minWidth: 18, height: 18, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{u}</span>}
+            </button>
+          )
+        })}
       </div>
+      {!selectedUser ? (
+        <Card><p style={{ color: T.inkFaint, fontStyle: 'italic', textAlign: 'center', margin: 0 }}>Seleziona un contatto per iniziare a chattare in privato</p></Card>
+      ) : (
+        <div style={{ border: `1.5px solid ${T.parchmentDarker}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '10px 14px', background: T.parchmentDark, borderBottom: `1px solid ${T.parchmentDarker}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedUser.player_color || T.gold }} />
+            <span style={{ fontWeight: 700, color: T.ink, fontFamily: "'Cinzel', Georgia, serif", fontSize: 14 }}>{selectedUser.username}</span>
+            <span style={{ fontSize: 11, color: T.inkFaint, fontStyle: 'italic' }}>— conversazione privata</span>
+          </div>
+          <div style={{ height: 320, overflowY: 'auto', padding: '12px', background: T.parchment, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {loading && <p style={{ color: T.inkFaint, textAlign: 'center', fontStyle: 'italic' }}>Caricamento...</p>}
+            {!loading && messages.length === 0 && <p style={{ color: T.inkFaint, textAlign: 'center', fontStyle: 'italic' }}>Nessun messaggio ancora.</p>}
+            {messages.map(m => {
+              const isMe = m.sender_id === profile.id
+              return (
+                <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ maxWidth: '80%', background: isMe ? T.gold + '33' : T.parchmentDark, border: `1px solid ${isMe ? T.gold + '66' : T.parchmentDarker}`, borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '8px 12px' }}>
+                    <p style={{ margin: 0, fontSize: 15, color: T.ink, lineHeight: 1.5, wordBreak: 'break-word' }}>{m.content}</p>
+                    <p style={{ margin: '3px 0 0', fontSize: 10, color: T.inkFaint, textAlign: isMe ? 'right' : 'left' }}>{fmt(m.created_at)}</p>
+                  </div>
+                </div>
+              )
+            })}
+            <div ref={msgEndRef} />
+          </div>
+          <div style={{ padding: '8px 10px', background: T.parchmentDark, borderTop: `1px solid ${T.parchmentDarker}`, display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input ref={inputRef} value={newMsg} onChange={e => setNewMsg(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
+              placeholder={'Messaggio a ' + selectedUser.username + '...'}
+              style={{ flex: 1, padding: '10px 14px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 20, background: T.parchment, fontSize: 14, color: T.ink, outline: 'none', minWidth: 0 }} />
+            <button onClick={sendMsg} disabled={!newMsg.trim()}
+              style={{ width: 40, height: 40, borderRadius: '50%', background: newMsg.trim() ? T.gold : T.parchmentDarker, border: 'none', cursor: newMsg.trim() ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 700, fontSize: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>→</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
+
 
 // ─── Party ────────────────────────────────────────────────────────────────────
 function SharedSection({ isDM }) {
@@ -2258,10 +2265,9 @@ export default function Campaign({ profile, onLogout }) {
       .then(({ count }) => setUnreadCount(count || 0))
     // Realtime for new messages
     const ch = supabase.channel(`app_unread_${profile.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        if (payload.new && payload.new.recipient_id === profile.id) {
-          setUnreadCount(c => c + 1)
-        }
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `recipient_id=eq.${profile.id}` }, () => {
+        setUnreadCount(c => c + 1)
       }).subscribe()
     return () => supabase.removeChannel(ch)
   }, [profile?.id])
@@ -2501,7 +2507,7 @@ ${lootEntry.notes}
     if (activeSection === 'party') return <SharedSection isDM={isDM} />
     if (activeSection === 'dadi') return <DiceSection />
     if (activeSection === 'note_dm' && isDM) return <DMNotesSection />
-    if (activeSection === 'messaggi') return <ChatSection profile={profile} players={players} isDM={isDM} allContacts={allContacts} onMessagesRead={(n) => setUnreadCount(c => Math.max(0, c - n))} />
+    if (activeSection === 'messaggi') return <ChatSection profile={profile} players={players} isDM={isDM} allContacts={allContacts} />
     if (activeSection.startsWith('player_')) {
       const pid = activeSection.replace('player_', '')
       const player = players.find(p => p.id === pid)
@@ -2523,7 +2529,7 @@ ${lootEntry.notes}
         {exporting && <span style={{ fontSize: 12, color: T.goldLight, fontStyle: 'italic' }}>⏳ Esportazione...</span>}
         <span style={{ fontSize: 13, color: T.goldLight, fontStyle: 'italic' }}>{profile?.username}</span>
       </div>
-      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} onExport={exportKnowledgeBase} unreadCount={unreadCount} onChatOpen={() => {}} />
+      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} onExport={exportKnowledgeBase} unreadCount={unreadCount} onChatOpen={() => setUnreadCount(0)} />
       <div style={{ padding: '1.25rem 1rem', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ ...parchmentBg, borderRadius: 8, padding: '1.5rem', minHeight: 'calc(100vh - 80px)', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)', border: `1px solid ${T.parchmentDarker}` }}>
           {renderSection()}
