@@ -29,13 +29,14 @@ function RichText({ value, style }) {
 }
 
 function RichEditor({ value, onChange, placeholder, height }) {
+  const safeValue = value == null ? '' : String(value)
   const taRef = useRef()
   const insert = (before, after = '', placeholder2 = '') => {
     const el = taRef.current
-    if (!el) { onChange((value || '') + before + placeholder2 + after); return }
+    if (!el) { onChange(safeValue + before + placeholder2 + after); return }
     const s = el.selectionStart, e = el.selectionEnd
-    const sel = (value || '').substring(s, e) || placeholder2
-    const newVal = (value || '').substring(0, s) + before + sel + after + (value || '').substring(e)
+    const sel = safeValue.substring(s, e) || placeholder2
+    const newVal = safeValue.substring(0, s) + before + sel + after + safeValue.substring(e)
     onChange(newVal)
     setTimeout(() => {
       if (el) {
@@ -61,13 +62,13 @@ function RichEditor({ value, onChange, placeholder, height }) {
   const insertLink = () => {
     if (!linkUrl) return
     const md = `[${linkText || linkUrl}](${linkUrl})`
-    onChange((value || '') + md)
+    onChange(safeValue + md)
     setShowLink(false); setLinkUrl(''); setLinkText('')
   }
   const insertImg = () => {
     if (!imgUrl) return
     const md = `\n![${imgAlt || 'immagine'}](${imgUrl})\n`
-    onChange((value || '') + md)
+    onChange(safeValue + md)
     setShowImg(false); setImgUrl(''); setImgAlt('')
   }
   const uploadImg = async (e) => {
@@ -101,8 +102,8 @@ function RichEditor({ value, onChange, placeholder, height }) {
         </button>
       </div>
       {preview
-        ? <div style={{ padding: '12px 14px', minHeight: height || 200, background: '#f4e4c1', fontSize: 15, lineHeight: 1.8, color: '#5c3d2e', fontFamily: "'Crimson Text', Georgia, serif" }} dangerouslySetInnerHTML={{ __html: renderMd(value) || '<span style="color:#8b6355;font-style:italic">Nessun contenuto...</span>' }} />
-        : <textarea ref={taRef} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder || 'Scrivi qui...'} style={{ width: '100%', boxSizing: 'border-box', minHeight: height || 200, padding: '12px 14px', background: '#f4e4c1', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.8, resize: 'vertical', color: '#2c1810', fontFamily: "'Crimson Text', Georgia, serif" }} />
+        ? <div style={{ padding: '12px 14px', minHeight: height || 200, background: '#f4e4c1', fontSize: 15, lineHeight: 1.8, color: '#5c3d2e', fontFamily: "'Crimson Text', Georgia, serif" }} dangerouslySetInnerHTML={{ __html: renderMd(safeValue) || '<span style="color:#8b6355;font-style:italic">Nessun contenuto...</span>' }} />
+        : <textarea ref={taRef} value={safeValue} onChange={e => onChange(e.target.value)} placeholder={placeholder || 'Scrivi qui...'} style={{ width: '100%', boxSizing: 'border-box', minHeight: height || 200, padding: '12px 14px', background: '#f4e4c1', border: 'none', outline: 'none', fontSize: 15, lineHeight: 1.8, resize: 'vertical', color: '#2c1810', fontFamily: "'Crimson Text', Georgia, serif" }} />
       }
       {showLink && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -484,7 +485,7 @@ function SessionsSection({ isDM }) {
   }, [])
 
   const openAdd = () => { setEditing(null); setForm({ number: '', title: '', date: '', summary: '' }); setShowModal(true) }
-  const openEdit = (e, s) => { e.stopPropagation(); setEditing(s); setForm({ number: s.number, title: s.title, date: s.date || '', summary: s.summary || '' }); setShowModal(true) }
+  const openEdit = (e, s) => { e.stopPropagation(); setEditing(s); setForm({ number: s.number || '', title: s.title || '', date: s.date || '', summary: s.summary || '' }); setShowModal(true) }
   const save = async () => {
     if (!form.title) return
     if (editing) { const { data } = await supabase.from('sessions').update(form).eq('id', editing.id).select(); if (data) setSessions(sessions.map(s => s.id === editing.id ? data[0] : s)) }
@@ -1666,14 +1667,15 @@ function ChatSection({ profile, players, isDM }) {
   const [selectedUser, setSelectedUser] = useState(null)
   const [newMsg, setNewMsg] = useState('')
   const [loading, setLoading] = useState(false)
-  const [allProfiles, setAllProfiles] = useState([])
+  const [allProfiles, setAllProfiles] = useState(players || [])
   const [unread, setUnread] = useState({}) // { userId: count }
   const msgEndRef = useRef()
   const inputRef = useRef()
 
   useEffect(() => {
-    supabase.from('profiles').select('*').order('username').then(({ data }) => {
-      setAllProfiles(data || [])
+    // Load DM profiles to add to contacts
+    supabase.from('profiles').select('*').eq('role', 'dm').then(({ data }) => {
+      if (data) setAllProfiles(prev => [...(players || []), ...data])
     })
     // Load unread counts
     supabase.from('messages').select('sender_id').eq('recipient_id', profile.id).eq('read', false)
@@ -1684,8 +1686,12 @@ function ChatSection({ profile, players, isDM }) {
       })
   }, [])
 
-  // Contacts: DM sees only messages to/from self, not between players
-  const contacts = allProfiles.filter(p => p.id !== profile.id)
+  // Use players passed from parent - always available, no RLS issue
+  // DM sees all players; players see DM + all other players
+  const contactMap = {}
+  ;allProfiles.forEach(p => { if (p.id !== profile.id) contactMap[p.id] = p })
+  ;(players || []).forEach(p => { if (p.id !== profile.id) contactMap[p.id] = p })
+  const contacts = Object.values(contactMap)
 
   useEffect(() => {
     if (!selectedUser) return
@@ -1907,7 +1913,7 @@ function SharedSection({ isDM }) {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 700, fontSize: 18, color: T.red, ...headerFont }}>📋 Missioni</span>{isDM && <BtnP onClick={openAddQuest}>+ Nuova</BtnP>}</div>
           {quests.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessuna missione in corso...</p>}
-          {quests.map(q => <Card key={q.id} style={{ marginBottom: 10 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}><span style={{ fontWeight: 600, flex: 1, color: T.ink, fontSize: 16, ...headerFont }}>{q.title}</span><div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}><Badge color={QUEST_STATUS_COLORS[q.status] || T.inkFaint}>{q.status}</Badge>{isDM && <><button onClick={() => openEditQuest(q)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>✏️</button><button onClick={() => removeQuest(q.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button></> }</div></div><p style={{ margin: '6px 0', fontSize: 15, color: T.inkLight, lineHeight: 1.6 }}>{q.description}</p>{q.reward && <div style={{ fontSize: 13, color: T.gold, fontStyle: 'italic' }}>⚜️ Ricompensa: {q.reward}</div>}</Card>)}
+          {quests.map(q => <Card key={q.id} style={{ marginBottom: 10 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}><span style={{ fontWeight: 600, flex: 1, color: T.ink, fontSize: 16, ...headerFont }}>{q.title}</span><div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}><Badge color={QUEST_STATUS_COLORS[q.status] || T.inkFaint}>{q.status}</Badge><button onClick={() => openEditQuest(q)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>✏️</button>{isDM && <button onClick={() => removeQuest(q.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button>}</div></div><p style={{ margin: '6px 0', fontSize: 15, color: T.inkLight, lineHeight: 1.6 }}>{q.description}</p>{q.reward && <div style={{ fontSize: 13, color: T.gold, fontStyle: 'italic' }}>⚜️ Ricompensa: {q.reward}</div>}</Card>)}
           {showQuestModal && <Modal title={editingQuest ? 'Modifica Missione' : 'Nuova Missione'} onClose={() => setShowQuestModal(false)}><FF label="Titolo"><Input value={questForm.title} onChange={e => setQuestForm({ ...questForm, title: e.target.value })} /></FF><FF label="Stato"><Sel value={questForm.status} onChange={e => setQuestForm({ ...questForm, status: e.target.value })}>{Object.keys(QUEST_STATUS_COLORS).map(s => <option key={s}>{s}</option>)}</Sel></FF><FF label="Descrizione"><Textarea value={questForm.description} onChange={e => setQuestForm({ ...questForm, description: e.target.value })} /></FF><FF label="Ricompensa"><Input value={questForm.reward} onChange={e => setQuestForm({ ...questForm, reward: e.target.value })} /></FF><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowQuestModal(false)}>Annulla</BtnS><BtnP onClick={saveQuest}>Salva</BtnP></div></Modal>}
         </div>
       )}
