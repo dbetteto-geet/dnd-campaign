@@ -1667,14 +1667,24 @@ function ChatSection({ profile, players, isDM }) {
   const [newMsg, setNewMsg] = useState('')
   const [loading, setLoading] = useState(false)
   const [allProfiles, setAllProfiles] = useState([])
+  const [unread, setUnread] = useState({}) // { userId: count }
   const msgEndRef = useRef()
+  const inputRef = useRef()
 
   useEffect(() => {
     supabase.from('profiles').select('*').order('username').then(({ data }) => {
       setAllProfiles(data || [])
     })
+    // Load unread counts
+    supabase.from('messages').select('sender_id').eq('recipient_id', profile.id).eq('read', false)
+      .then(({ data }) => {
+        const counts = {}
+        ;(data || []).forEach(m => { counts[m.sender_id] = (counts[m.sender_id] || 0) + 1 })
+        setUnread(counts)
+      })
   }, [])
 
+  // Contacts: DM sees only messages to/from self, not between players
   const contacts = allProfiles.filter(p => p.id !== profile.id)
 
   useEffect(() => {
@@ -1684,102 +1694,129 @@ function ChatSection({ profile, players, isDM }) {
       .select('*')
       .or(`and(sender_id.eq.${profile.id},recipient_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},recipient_id.eq.${profile.id})`)
       .order('created_at')
-      .then(({ data }) => { setMessages(data || []); setLoading(false) })
-
-    // Mark as read
-    supabase.from('messages').update({ read: true })
-      .eq('recipient_id', profile.id)
-      .eq('sender_id', selectedUser.id)
-      .eq('read', false)
-      .then(() => {})
+      .then(({ data }) => {
+        setMessages(data || [])
+        setLoading(false)
+        // Mark as read
+        supabase.from('messages').update({ read: true })
+          .eq('recipient_id', profile.id).eq('sender_id', selectedUser.id).eq('read', false).then(() => {})
+        setUnread(u => ({ ...u, [selectedUser.id]: 0 }))
+      })
 
     // Realtime
-    const channel = supabase.channel(`chat-${profile.id}-${selectedUser.id}`)
+    const channel = supabase.channel(`chat_${[profile.id, selectedUser.id].sort().join('_')}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const msg = payload.new
-        if ((msg.sender_id === profile.id && msg.recipient_id === selectedUser.id) ||
-            (msg.sender_id === selectedUser.id && msg.recipient_id === profile.id)) {
-          setMessages(m => [...m, msg])
-          if (msg.recipient_id === profile.id) {
+        const mine = msg.sender_id === profile.id && msg.recipient_id === selectedUser.id
+        const theirs = msg.sender_id === selectedUser.id && msg.recipient_id === profile.id
+        if (mine || theirs) {
+          setMessages(m => {
+            // Avoid duplicates (optimistic update already added it)
+            if (m.find(x => x.id === msg.id)) return m
+            return [...m, msg]
+          })
+          if (theirs) {
             supabase.from('messages').update({ read: true }).eq('id', msg.id).then(() => {})
           }
         }
       }).subscribe()
-    return () => supabase.removeChannel(channel)
-  }, [selectedUser])
 
-  useEffect(() => { msgEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+    // Listen for new messages from anyone (for unread badge)
+    const globalChannel = supabase.channel(`unread_${profile.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `recipient_id=eq.${profile.id}` }, (payload) => {
+        const msg = payload.new
+        if (msg.sender_id !== selectedUser?.id) {
+          setUnread(u => ({ ...u, [msg.sender_id]: (u[msg.sender_id] || 0) + 1 }))
+        }
+      }).subscribe()
+
+    return () => { supabase.removeChannel(channel); supabase.removeChannel(globalChannel) }
+  }, [selectedUser?.id])
+
+  useEffect(() => {
+    msgEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
 
   const sendMsg = async () => {
     if (!newMsg.trim() || !selectedUser) return
-    const msg = { sender_id: profile.id, recipient_id: selectedUser.id, content: newMsg.trim() }
+    const text = newMsg.trim()
     setNewMsg('')
-    await supabase.from('messages').insert([msg])
+    // Optimistic update
+    const tempMsg = { id: `temp_${Date.now()}`, sender_id: profile.id, recipient_id: selectedUser.id, content: text, created_at: new Date().toISOString(), read: false }
+    setMessages(m => [...m, tempMsg])
+    await supabase.from('messages').insert([{ sender_id: profile.id, recipient_id: selectedUser.id, content: text }])
+    inputRef.current?.focus()
   }
 
-  const formatTime = (d) => { try { return new Date(d).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+  const fmt = (d) => { try { return new Date(d).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) } catch { return '' } }
+  const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0)
 
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       <SH title="💬 Messaggi Privati" />
-      <div style={{ display: 'flex', gap: 12, height: 500 }}>
-        {/* Contacts list */}
-        <div style={{ width: 140, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {contacts.map(c => (
-            <button key={c.id} onClick={() => setSelectedUser(c)}
-              style={{ padding: '10px 8px', borderRadius: 6, border: selectedUser?.id === c.id ? `2px solid ${T.gold}` : `1px solid ${T.parchmentDarker}`, background: selectedUser?.id === c.id ? T.gold + '22' : T.parchmentDark, cursor: 'pointer', textAlign: 'left', ...bodyFont }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Contact list - horizontal on mobile */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {contacts.map(c => {
+            const u = unread[c.id] || 0
+            return (
+              <button key={c.id} onClick={() => setSelectedUser(c)}
+                style={{ padding: '8px 14px', borderRadius: 20, border: selectedUser?.id === c.id ? `2px solid ${T.gold}` : `1px solid ${T.parchmentDarker}`, background: selectedUser?.id === c.id ? T.gold + '22' : T.parchmentDark, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, position: 'relative' }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.player_color || T.gold, flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: T.ink, fontWeight: selectedUser?.id === c.id ? 700 : 400 }}>{c.username}</span>
-              </div>
-              {isDM && <div style={{ fontSize: 10, color: T.inkFaint, marginTop: 2 }}>{c.role === 'dm' ? 'DM' : 'Giocatore'}</div>}
-            </button>
-          ))}
+                <span style={{ fontSize: 14, color: T.ink, fontWeight: selectedUser?.id === c.id ? 700 : 400, ...bodyFont }}>{c.username}</span>
+                {u > 0 && <span style={{ background: T.red, color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{u}</span>}
+              </button>
+            )
+          })}
         </div>
 
         {/* Chat area */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', border: `1.5px solid ${T.parchmentDarker}`, borderRadius: 6, overflow: 'hidden' }}>
-          {!selectedUser ? (
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', background: T.parchmentDark }}>
-              <p style={{ color: T.inkFaint, fontStyle: 'italic', fontSize: 14 }}>Seleziona un contatto per chattare</p>
+        {!selectedUser ? (
+          <Card><p style={{ color: T.inkFaint, fontStyle: 'italic', textAlign: 'center', margin: 0 }}>Seleziona un contatto per iniziare a chattare in privato</p></Card>
+        ) : (
+          <div style={{ border: `1.5px solid ${T.parchmentDarker}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            {/* Header */}
+            <div style={{ padding: '10px 14px', background: T.parchmentDark, borderBottom: `1px solid ${T.parchmentDarker}`, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedUser.player_color || T.gold }} />
+              <span style={{ fontWeight: 700, color: T.ink, ...headerFont, fontSize: 14 }}>{selectedUser.username}</span>
+              <span style={{ fontSize: 11, color: T.inkFaint, fontStyle: 'italic' }}>— conversazione privata</span>
             </div>
-          ) : (
-            <>
-              <div style={{ padding: '8px 12px', background: T.parchmentDark, borderBottom: `1px solid ${T.parchmentDarker}`, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedUser.player_color || T.gold }} />
-                <span style={{ fontWeight: 700, color: T.ink, ...headerFont, fontSize: 14 }}>{selectedUser.username}</span>
-                <span style={{ fontSize: 11, color: T.inkFaint, fontStyle: 'italic' }}>— privato</span>
-              </div>
-              <div style={{ flex: 1, overflowY: 'auto', padding: '12px', background: T.parchment, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {loading && <p style={{ color: T.inkFaint, fontStyle: 'italic', textAlign: 'center' }}>Caricamento...</p>}
-                {messages.map(m => {
-                  const isMe = m.sender_id === profile.id
-                  return (
-                    <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
-                      <div style={{ maxWidth: '75%', background: isMe ? T.gold + '33' : T.parchmentDark, border: `1px solid ${isMe ? T.gold + '66' : T.parchmentDarker}`, borderRadius: isMe ? '12px 12px 4px 12px' : '12px 12px 12px 4px', padding: '8px 12px' }}>
-                        <p style={{ margin: 0, fontSize: 14, color: T.ink, lineHeight: 1.5 }}>{m.content}</p>
-                        <p style={{ margin: '4px 0 0', fontSize: 10, color: T.inkFaint, textAlign: isMe ? 'right' : 'left' }}>{formatTime(m.created_at)}</p>
-                      </div>
+            {/* Messages */}
+            <div style={{ height: 320, overflowY: 'auto', padding: '12px', background: T.parchment, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {loading && <p style={{ color: T.inkFaint, textAlign: 'center', fontStyle: 'italic' }}>Caricamento...</p>}
+              {!loading && messages.length === 0 && <p style={{ color: T.inkFaint, textAlign: 'center', fontStyle: 'italic' }}>Nessun messaggio ancora. Scrivi il primo!</p>}
+              {messages.map(m => {
+                const isMe = m.sender_id === profile.id
+                return (
+                  <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                    <div style={{ maxWidth: '80%', background: isMe ? T.gold + '33' : T.parchmentDark, border: `1px solid ${isMe ? T.gold + '66' : T.parchmentDarker}`, borderRadius: isMe ? '14px 14px 4px 14px' : '14px 14px 14px 4px', padding: '8px 12px' }}>
+                      <p style={{ margin: 0, fontSize: 15, color: T.ink, lineHeight: 1.5, wordBreak: 'break-word' }}>{m.content}</p>
+                      <p style={{ margin: '3px 0 0', fontSize: 10, color: T.inkFaint, textAlign: isMe ? 'right' : 'left' }}>{fmt(m.created_at)}</p>
                     </div>
-                  )
-                })}
-                <div ref={msgEndRef} />
-              </div>
-              <div style={{ padding: '8px', background: T.parchmentDark, borderTop: `1px solid ${T.parchmentDarker}`, display: 'flex', gap: 8 }}>
-                <input value={newMsg} onChange={e => setNewMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMsg()}
-                  placeholder="Scrivi un messaggio..." style={{ flex: 1, padding: '8px 12px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 20, background: T.parchment, fontSize: 14, color: T.ink, outline: 'none' }} />
-                <button onClick={sendMsg} disabled={!newMsg.trim()} style={{ padding: '8px 16px', background: newMsg.trim() ? T.gold : T.parchmentDarker, border: 'none', borderRadius: 20, cursor: newMsg.trim() ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 700, fontSize: 14 }}>→</button>
-              </div>
-            </>
-          )}
-        </div>
+                  </div>
+                )
+              })}
+              <div ref={msgEndRef} />
+            </div>
+            {/* Input */}
+            <div style={{ padding: '8px 10px', background: T.parchmentDark, borderTop: `1px solid ${T.parchmentDarker}`, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input ref={inputRef} value={newMsg} onChange={e => setNewMsg(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
+                placeholder={`Messaggio a ${selectedUser.username}...`}
+                style={{ flex: 1, padding: '10px 14px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 20, background: T.parchment, fontSize: 14, color: T.ink, outline: 'none', minWidth: 0 }} />
+              <button onClick={sendMsg} disabled={!newMsg.trim()}
+                style={{ width: 40, height: 40, borderRadius: '50%', background: newMsg.trim() ? T.gold : T.parchmentDarker, border: 'none', cursor: newMsg.trim() ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 700, fontSize: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>→</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 // ─── Party ────────────────────────────────────────────────────────────────────
-function SharedSection() {
+function SharedSection({ isDM }) {
   const [lootText, setLootText] = useState('')
   const [lootId, setLootId] = useState(null)
   const [editingLoot, setEditingLoot] = useState(false)
@@ -1868,9 +1905,9 @@ function SharedSection() {
       )}
       {activeTab === 'quest' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 700, fontSize: 18, color: T.red, ...headerFont }}>📋 Missioni</span><BtnP onClick={openAddQuest}>+ Nuova</BtnP></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}><span style={{ fontWeight: 700, fontSize: 18, color: T.red, ...headerFont }}>📋 Missioni</span>{isDM && <BtnP onClick={openAddQuest}>+ Nuova</BtnP>}</div>
           {quests.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessuna missione in corso...</p>}
-          {quests.map(q => <Card key={q.id} style={{ marginBottom: 10 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}><span style={{ fontWeight: 600, flex: 1, color: T.ink, fontSize: 16, ...headerFont }}>{q.title}</span><div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}><Badge color={QUEST_STATUS_COLORS[q.status] || T.inkFaint}>{q.status}</Badge><button onClick={() => openEditQuest(q)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>✏️</button><button onClick={() => removeQuest(q.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button></div></div><p style={{ margin: '6px 0', fontSize: 15, color: T.inkLight, lineHeight: 1.6 }}>{q.description}</p>{q.reward && <div style={{ fontSize: 13, color: T.gold, fontStyle: 'italic' }}>⚜️ Ricompensa: {q.reward}</div>}</Card>)}
+          {quests.map(q => <Card key={q.id} style={{ marginBottom: 10 }}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}><span style={{ fontWeight: 600, flex: 1, color: T.ink, fontSize: 16, ...headerFont }}>{q.title}</span><div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}><Badge color={QUEST_STATUS_COLORS[q.status] || T.inkFaint}>{q.status}</Badge>{isDM && <><button onClick={() => openEditQuest(q)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>✏️</button><button onClick={() => removeQuest(q.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button></> }</div></div><p style={{ margin: '6px 0', fontSize: 15, color: T.inkLight, lineHeight: 1.6 }}>{q.description}</p>{q.reward && <div style={{ fontSize: 13, color: T.gold, fontStyle: 'italic' }}>⚜️ Ricompensa: {q.reward}</div>}</Card>)}
           {showQuestModal && <Modal title={editingQuest ? 'Modifica Missione' : 'Nuova Missione'} onClose={() => setShowQuestModal(false)}><FF label="Titolo"><Input value={questForm.title} onChange={e => setQuestForm({ ...questForm, title: e.target.value })} /></FF><FF label="Stato"><Sel value={questForm.status} onChange={e => setQuestForm({ ...questForm, status: e.target.value })}>{Object.keys(QUEST_STATUS_COLORS).map(s => <option key={s}>{s}</option>)}</Sel></FF><FF label="Descrizione"><Textarea value={questForm.description} onChange={e => setQuestForm({ ...questForm, description: e.target.value })} /></FF><FF label="Ricompensa"><Input value={questForm.reward} onChange={e => setQuestForm({ ...questForm, reward: e.target.value })} /></FF><div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}><BtnS onClick={() => setShowQuestModal(false)}>Annulla</BtnS><BtnP onClick={saveQuest}>Salva</BtnP></div></Modal>}
         </div>
       )}
@@ -2121,7 +2158,7 @@ function ChangePasswordModal({ onClose }) {
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM, onChangePassword, onExport }) {
+function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM, onChangePassword, onExport, unreadCount, onChatOpen }) {
   const DM_SECTIONS = [
     { id: 'sessioni', label: 'Sessioni', icon: '📜' },
     { id: 'npc', label: 'NPC', icon: '⚔' },
@@ -2132,9 +2169,9 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
     { id: 'spells', label: 'Incantesimi', icon: '✨' },
     { id: 'party', label: 'Compagnia', icon: '⚔️' },
     { id: 'dadi', label: 'Tira Dadi', icon: '🎲' },
+    { id: 'messaggi', label: 'Messaggi', icon: '💬' },
   ]
   const DM_ONLY = [{ id: 'note_dm', label: 'Pergamene Segrete', icon: '🔒' }]
-  const BOTTOM_SECTIONS = [{ id: 'messaggi', label: 'Messaggi', icon: '💬' }]
   const playerSections = isDM ? players : players.filter(p => p.id === profile?.id)
   const handleNav = (id) => { setActiveSection(id); onClose() }
   const isActive = (id) => activeSection === id
@@ -2161,15 +2198,19 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
         </div>
         <div style={{ flex: 1, padding: '1rem 0.5rem' }}>
           <div style={{ fontSize: 10, color: T.goldLight, padding: '0 0.75rem', marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'Cinzel', Georgia, serif" }}>LA CAMPAGNA</div>
-          {DM_SECTIONS.map(s => <button key={s.id} onClick={() => handleNav(s.id)} style={btnStyle(s.id)}><span style={{ fontSize: 16 }}>{s.icon}</span>{s.label}</button>)}
+          {DM_SECTIONS.map(s => (
+          <button key={s.id} onClick={() => { handleNav(s.id); if (s.id === 'messaggi') onChatOpen() }} style={btnStyle(s.id)}>
+            <span style={{ fontSize: 16 }}>{s.icon}</span>
+            {s.label}
+            {s.id === 'messaggi' && unreadCount > 0 && <span style={{ marginLeft: 'auto', background: T.red, color: '#fff', borderRadius: '50%', width: 18, height: 18, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{unreadCount}</span>}
+          </button>
+        ))}
           {isDM && <>
             <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
             <div style={{ fontSize: 10, color: T.goldLight, padding: '0 0.75rem', marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'Cinzel', Georgia, serif" }}>SEGRETI</div>
             {DM_ONLY.map(s => <button key={s.id} onClick={() => handleNav(s.id)} style={btnStyle(s.id)}><span style={{ fontSize: 16 }}>{s.icon}</span>{s.label}</button>)}
           </>}
           <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
-          <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
-          {BOTTOM_SECTIONS.map(s => <button key={s.id} onClick={() => handleNav(s.id)} style={btnStyle(s.id)}><span style={{ fontSize: 16 }}>{s.icon}</span>{s.label}</button>)}
           <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
           <div style={{ fontSize: 10, color: T.goldLight, padding: '0 0.75rem', marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'Cinzel', Georgia, serif" }}>LA COMPAGNIA</div>
           {playerSections.map(p => <button key={p.id} onClick={() => handleNav('player_' + p.id)} style={btnStyle('player_' + p.id)}><span style={{ width: 10, height: 10, borderRadius: '50%', background: p.player_color || T.gold, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 4px ${p.player_color || T.gold}88` }} />{p.username}</button>)}
@@ -2198,7 +2239,23 @@ export default function Campaign({ profile, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const isDM = profile?.role === 'dm'
+
+  useEffect(() => {
+    if (!profile) return
+    // Load initial unread count
+    supabase.from('messages').select('id', { count: 'exact' })
+      .eq('recipient_id', profile.id).eq('read', false)
+      .then(({ count }) => setUnreadCount(count || 0))
+    // Realtime for new messages
+    const ch = supabase.channel(`app_unread_${profile.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `recipient_id=eq.${profile.id}` }, () => {
+        setUnreadCount(c => c + 1)
+      }).subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [profile?.id])
 
   const exportKnowledgeBase = async () => {
     setExporting(true)
@@ -2428,7 +2485,7 @@ ${lootEntry.notes}
     if (activeSection === 'lore') return <LoreSection isDM={isDM} />
     if (activeSection === 'timeline') return <TimelineSection isDM={isDM} />
     if (activeSection === 'spells') return <SpellsSection />
-    if (activeSection === 'party') return <SharedSection />
+    if (activeSection === 'party') return <SharedSection isDM={isDM} />
     if (activeSection === 'dadi') return <DiceSection />
     if (activeSection === 'note_dm' && isDM) return <DMNotesSection />
     if (activeSection === 'messaggi') return <ChatSection profile={profile} players={players} isDM={isDM} />
@@ -2453,7 +2510,7 @@ ${lootEntry.notes}
         {exporting && <span style={{ fontSize: 12, color: T.goldLight, fontStyle: 'italic' }}>⏳ Esportazione...</span>}
         <span style={{ fontSize: 13, color: T.goldLight, fontStyle: 'italic' }}>{profile?.username}</span>
       </div>
-      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} onExport={exportKnowledgeBase} />
+      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} onExport={exportKnowledgeBase} unreadCount={unreadCount} onChatOpen={() => setUnreadCount(0)} />
       <div style={{ padding: '1.25rem 1rem', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ ...parchmentBg, borderRadius: 8, padding: '1.5rem', minHeight: 'calc(100vh - 80px)', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)', border: `1px solid ${T.parchmentDarker}` }}>
           {renderSection()}
