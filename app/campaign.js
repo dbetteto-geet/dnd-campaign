@@ -1556,7 +1556,6 @@ function PlayerTab({ player, currentUserId, isDM }) {
                   </div>
                 </Card>
               )}
-              )}
             </div>
           ) : <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessuna scheda. {isOwner && 'Clicca "Modifica Scheda" per iniziare.'}</p>}
         </div>
