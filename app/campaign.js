@@ -2196,28 +2196,21 @@ function InitiativeSection({ isDM, profile, players }) {
   const [myRoll, setMyRoll] = useState('')
   const [hasSubmitted, setHasSubmitted] = useState(false)
 
-  useEffect(() => {
+  const loadEntries = () =>
     supabase.from('initiative').select('*').order('roll', { ascending: false }).then(({ data }) => {
-      setEntries(data || [])
-      if (data) {
-        const mine = data.find(e => e.player_id === profile.id && !e.is_monster)
-        setHasSubmitted(!!mine)
-        if (mine) setMyRoll(String(mine.roll))
-      }
+      const d = data || []
+      setEntries(d)
+      const mine = d.find(e => e.player_id === profile.id && !e.is_monster)
+      setHasSubmitted(!!mine)
+      if (mine) setMyRoll(String(mine.roll))
       setLoading(false)
     })
-    // Realtime
-    const ch = supabase.channel('initiative_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'initiative' }, () => {
-        supabase.from('initiative').select('*').order('roll', { ascending: false }).then(({ data }) => {
-          setEntries(data || [])
-          if (data) {
-            const mine = data.find(e => e.player_id === profile.id && !e.is_monster)
-            setHasSubmitted(!!mine)
-            if (mine) setMyRoll(String(mine.roll))
-          }
-        })
-      }).subscribe()
+
+  useEffect(() => {
+    loadEntries()
+    const ch = supabase.channel('initiative_rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'initiative' }, loadEntries)
+      .subscribe()
     return () => supabase.removeChannel(ch)
   }, [])
 
@@ -2230,13 +2223,10 @@ function InitiativeSection({ isDM, profile, players }) {
       await supabase.from('initiative').update({ roll }).eq('id', existing.id)
     } else {
       await supabase.from('initiative').insert([{
-        name: playerProfile?.username || profile.id,
-        roll,
-        player_id: profile.id,
-        is_monster: false,
+        name: playerProfile?.username || 'Giocatore',
+        roll, player_id: profile.id, is_monster: false,
         color: playerProfile?.player_color || T.gold,
-        position: 0,
-        is_active: false
+        position: 0, is_active: false
       }])
     }
     setHasSubmitted(true)
@@ -2245,65 +2235,62 @@ function InitiativeSection({ isDM, profile, players }) {
   const addMonster = async () => {
     if (!monsterForm.name) return
     await supabase.from('initiative').insert([{
-      name: monsterForm.name,
-      roll: parseInt(monsterForm.roll) || 0,
-      is_monster: true,
-      color: monsterForm.color,
-      position: 0,
-      is_active: false
+      name: monsterForm.name, roll: parseInt(monsterForm.roll) || 0,
+      is_monster: true, color: monsterForm.color, position: 0, is_active: false
     }])
     setShowAddMonster(false)
     setMonsterForm({ name: '', roll: 0, color: T.red })
   }
 
-  const removeEntry = async (id) => {
-    await supabase.from('initiative').delete().eq('id', id)
-  }
+  const removeEntry = async (id) => supabase.from('initiative').delete().eq('id', id)
 
   const clearAll = async () => {
     await supabase.from('initiative').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-    setHasSubmitted(false)
-    setMyRoll('')
+    setHasSubmitted(false); setMyRoll('')
   }
 
   const setActive = async (id) => {
-    // Set all inactive, then set this one active
-    const updates = entries.map(e =>
+    await Promise.all(entries.map(e =>
       supabase.from('initiative').update({ is_active: e.id === id }).eq('id', e.id)
-    )
-    await Promise.all(updates)
+    ))
   }
 
   const nextTurn = async () => {
+    if (entries.length === 0) return
     const activeIdx = entries.findIndex(e => e.is_active)
     const nextIdx = (activeIdx + 1) % entries.length
-    if (entries.length === 0) return
-    const updates = entries.map((e, i) =>
+    await Promise.all(entries.map((e, i) =>
       supabase.from('initiative').update({ is_active: i === nextIdx }).eq('id', e.id)
-    )
-    await Promise.all(updates)
+    ))
   }
 
   if (loading) return <p style={{ color: T.inkFaint }}>Caricamento...</p>
 
+  // Display: active entry first, then the rest in roll order
+  const activeIdx = entries.findIndex(e => e.is_active)
+  const displayEntries = activeIdx >= 0
+    ? [...entries.slice(activeIdx), ...entries.slice(0, activeIdx)]
+    : entries
   const activeEntry = entries.find(e => e.is_active)
 
   return (
     <div>
       <SH title="⚔️ Iniziativa" action={
-        isDM && <div style={{ display: 'flex', gap: 8 }}>
-          <BtnS onClick={() => setShowAddMonster(true)}>+ Mostro</BtnS>
-          <BtnD onClick={clearAll}>🗑 Azzera</BtnD>
-        </div>
+        isDM && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <BtnS onClick={() => setShowAddMonster(true)}>+ Mostro</BtnS>
+            <BtnD onClick={clearAll}>🗑 Azzera</BtnD>
+          </div>
+        )
       } />
 
       {/* Player roll input */}
       {!isDM && (
         <Card style={{ marginBottom: 16 }}>
           <p style={{ fontSize: 13, color: T.inkFaint, marginBottom: 10, fontStyle: 'italic' }}>Inserisci il tuo tiro di iniziativa:</p>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <Input type="number" value={myRoll} onChange={e => setMyRoll(e.target.value)}
-              placeholder="es. 14" style={{ maxWidth: 100 }} />
+              placeholder="es. 14" style={{ maxWidth: 90 }} />
             <BtnP onClick={submitMyRoll} disabled={!myRoll}>{hasSubmitted ? '↻ Aggiorna' : '✓ Conferma'}</BtnP>
             {hasSubmitted && <span style={{ fontSize: 13, color: T.green }}>✓ Inviato</span>}
           </div>
@@ -2312,58 +2299,68 @@ function InitiativeSection({ isDM, profile, players }) {
 
       {/* DM controls */}
       {isDM && entries.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          <BtnP onClick={nextTurn}>→ Prossimo turno</BtnP>
-          {activeEntry && <span style={{ fontSize: 14, color: T.gold, display: 'flex', alignItems: 'center', fontStyle: 'italic' }}>Turno di: <strong style={{ marginLeft: 6, color: T.ink }}>{activeEntry.name}</strong></span>}
+        <div style={{ marginBottom: 16 }}>
+          <BtnP onClick={nextTurn} style={{ marginBottom: 8 }}>→ Prossimo turno</BtnP>
+          {activeEntry && (
+            <p style={{ fontSize: 13, color: T.gold, margin: 0, fontStyle: 'italic' }}>
+              Turno di: <strong style={{ color: T.ink, ...headerFont }}>{activeEntry.name}</strong>
+            </p>
+          )}
         </div>
       )}
 
-      {/* Initiative order */}
-      {entries.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessun partecipante ancora — inserite i vostri tiri!</p>}
+      {entries.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessun partecipante ancora...</p>}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {entries.map((entry, idx) => (
+        {displayEntries.map((entry, i) => (
           <div key={entry.id} style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '12px 16px', borderRadius: 8,
-            background: entry.is_active ? `linear-gradient(135deg, ${entry.color || T.gold}33, ${entry.color || T.gold}11)` : idx === 0 ? T.parchmentDark : T.parchment,
-            border: entry.is_active ? `2px solid ${entry.color || T.gold}` : `1.5px solid ${entry.is_monster ? T.red + '66' : T.parchmentDarker}`,
-            boxShadow: entry.is_active ? `0 0 16px ${entry.color || T.gold}44` : 'none',
-            transition: 'all 0.2s',
+            borderRadius: 8,
+            background: entry.is_active
+              ? `linear-gradient(135deg, ${entry.color || T.gold}22, ${entry.color || T.gold}11)`
+              : T.parchment,
+            border: entry.is_active
+              ? `2px solid ${entry.color || T.gold}`
+              : `1.5px solid ${entry.is_monster ? T.red + '55' : T.parchmentDarker}`,
+            boxShadow: entry.is_active ? `0 0 14px ${entry.color || T.gold}33` : 'none',
+            overflow: 'hidden',
           }}>
-            {/* Position number */}
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: entry.color || T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{idx + 1}</span>
-            </div>
-            {/* Name + type */}
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 16, color: T.ink, ...headerFont }}>{entry.name}</span>
-                {entry.is_monster && <Badge color={T.red}>Mostro</Badge>}
-                {entry.is_active && <Badge color={entry.color || T.gold}>✦ TURNO</Badge>}
+            <div style={{ display: 'flex', alignItems: 'center', padding: '10px 14px', gap: 10 }}>
+              {/* Number badge */}
+              <div style={{ width: 26, height: 26, borderRadius: '50%', background: entry.color || T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{i + 1}</span>
               </div>
-            </div>
-            {/* Roll */}
-            <div style={{ textAlign: 'center', minWidth: 48 }}>
-              <div style={{ fontSize: 11, color: T.inkFaint, ...headerFont }}>INIT</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: T.ink, ...headerFont }}>{entry.roll}</div>
-            </div>
-            {/* DM actions */}
-            {isDM && (
-              <div style={{ display: 'flex', gap: 4 }}>
-                <button onClick={() => setActive(entry.id)}
-                  title="Imposta come turno attivo"
-                  style={{ padding: '4px 8px', background: entry.is_active ? T.gold : T.parchmentDark, border: `1px solid ${T.gold}`, borderRadius: 4, cursor: 'pointer', fontSize: 13, color: entry.is_active ? '#fff' : T.gold, fontWeight: 600 }}>
-                  {entry.is_active ? '★' : '☆'}
-                </button>
-                <button onClick={() => removeEntry(entry.id)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button>
+
+              {/* Name */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: T.ink, ...headerFont, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.name}</div>
+                <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                  {entry.is_monster && <span style={{ fontSize: 10, color: T.red, border: `1px solid ${T.red}44`, borderRadius: 3, padding: '0 5px', ...headerFont }}>MOSTRO</span>}
+                  {entry.is_active && <span style={{ fontSize: 10, color: entry.color || T.gold, border: `1px solid ${entry.color || T.gold}66`, borderRadius: 3, padding: '0 5px', ...headerFont }}>✦ TURNO</span>}
+                </div>
               </div>
-            )}
+
+              {/* Roll */}
+              <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                <div style={{ fontSize: 10, color: T.inkFaint, ...headerFont, letterSpacing: '0.05em' }}>INIT</div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: T.ink, ...headerFont, lineHeight: 1 }}>{entry.roll}</div>
+              </div>
+
+              {/* DM actions */}
+              {isDM && (
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 4 }}>
+                  <button onClick={() => setActive(entry.id)} title="Imposta turno"
+                    style={{ width: 32, height: 32, borderRadius: 6, background: entry.is_active ? T.gold : T.parchmentDark, border: `1px solid ${T.gold}`, cursor: 'pointer', fontSize: 14, color: entry.is_active ? '#fff' : T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {entry.is_active ? '★' : '☆'}
+                  </button>
+                  <button onClick={() => removeEntry(entry.id)}
+                    style={{ width: 32, height: 32, borderRadius: 6, background: 'none', border: `1px solid ${T.parchmentDarker}`, cursor: 'pointer', fontSize: 14, color: T.inkFaint, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🗑</button>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* DM: add monster modal */}
       {showAddMonster && (
         <Modal title="Aggiungi Mostro" onClose={() => setShowAddMonster(false)}>
           <FF label="Nome"><Input value={monsterForm.name} onChange={e => setMonsterForm({ ...monsterForm, name: e.target.value })} placeholder="es. Goblin, Drago Rosso..." /></FF>
@@ -2372,7 +2369,7 @@ function InitiativeSection({ isDM, profile, players }) {
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[T.red, T.purple, '#1a4a3c', T.blue, T.inkFaint, '#7a1a4a'].map(c => (
                 <button key={c} onClick={() => setMonsterForm({ ...monsterForm, color: c })}
-                  style={{ width: 32, height: 32, borderRadius: '50%', background: c, border: monsterForm.color === c ? `3px solid ${T.ink}` : `2px solid transparent`, cursor: 'pointer' }} />
+                  style={{ width: 32, height: 32, borderRadius: '50%', background: c, border: monsterForm.color === c ? `3px solid ${T.ink}` : '2px solid transparent', cursor: 'pointer' }} />
               ))}
             </div>
           </FF>
@@ -2385,6 +2382,7 @@ function InitiativeSection({ isDM, profile, players }) {
     </div>
   )
 }
+
 
 // ─── Cambio password ──────────────────────────────────────────────────────────
 function ChangePasswordModal({ onClose }) {
