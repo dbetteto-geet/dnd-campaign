@@ -1328,7 +1328,7 @@ function PlayerTab({ player, currentUserId, isDM }) {
           : <div style={{ width: 60, height: 60, borderRadius: '50%', background: (player.player_color || T.gold) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 600, color: player.player_color || T.gold, border: `3px solid ${player.player_color || T.gold}`, flexShrink: 0, ...headerFont }}>{player.username[0]}</div>}
         <div>
           <div style={{ fontWeight: 700, fontSize: 19, color: T.ink, ...headerFont }}>{character?.name || player.username}</div>
-          {character && <div style={{ fontSize: 15, color: T.inkFaint, fontStyle: 'italic' }}>{character.race} · {character.class} · Livello {character.level}</div>}
+          {character && <div style={{ fontSize: 15, color: T.inkFaint, fontStyle: 'italic' }}>{character.race} · {character.class}{character.multiclass && character.class2 ? ` ${character.level}/${character.class2} ${character.level2}` : ''} · Livello {character.multiclass && character.class2 ? (parseInt(character.level||0) + parseInt(character.level2||0)) : character.level}</div>}
         </div>
       </div>
       <Tabs tabs={['scheda', 'incantesimi', 'inventario', 'famigli', 'note sessione']} active={activeTab} onChange={setActiveTab} />
@@ -1344,10 +1344,25 @@ function PlayerTab({ player, currentUserId, isDM }) {
               <ImgUpload bucket="character-images" folder="characters" currentPath={charForm.image_path} onUploaded={p => setCharForm({ ...charForm, image_path: p })} label="Ritratto" />
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%,200px),1fr))', gap: '0 12px' }}>
                 <FF label="Nome"><Input value={charForm.name} onChange={e => setCharForm({ ...charForm, name: e.target.value })} /></FF>
-                <FF label="Classe"><Input value={charForm.class} onChange={e => setCharForm({ ...charForm, class: e.target.value })} /></FF>
+                <FF label="Classe">
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <Input value={charForm.class} onChange={e => setCharForm({ ...charForm, class: e.target.value })} placeholder="es. Ranger" />
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer', color: T.inkLight }}>
+                      <input type="checkbox" checked={!!charForm.multiclass} onChange={e => setCharForm({ ...charForm, multiclass: e.target.checked, class2: e.target.checked ? (charForm.class2 || '') : '', level2: e.target.checked ? (charForm.level2 || 1) : 0 })} style={{ width: 16, height: 16 }} />
+                      Multiclasse
+                    </label>
+                    {charForm.multiclass && (
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <Input value={charForm.class2 || ''} onChange={e => setCharForm({ ...charForm, class2: e.target.value })} placeholder="Seconda classe" style={{ flex: 1 }} />
+                        <Input type="number" min="1" value={charForm.level2 || 1} onChange={e => setCharForm({ ...charForm, level2: parseInt(e.target.value) || 1 })} style={{ width: 70 }} />
+                        <span style={{ fontSize: 12, color: T.inkFaint }}>liv.</span>
+                      </div>
+                    )}
+                  </div>
+                </FF>
                 <FF label="Razza"><Input value={charForm.race} onChange={e => setCharForm({ ...charForm, race: e.target.value })} /></FF>
                 <FF label="Background"><Input value={charForm.background} onChange={e => setCharForm({ ...charForm, background: e.target.value })} /></FF>
-                <FF label="Livello"><Input type="number" value={charForm.level} onChange={e => setCharForm({ ...charForm, level: e.target.value })} /></FF>
+                <FF label={charForm.multiclass ? "Livello (classe principale)" : "Livello"}><Input type="number" value={charForm.level} onChange={e => setCharForm({ ...charForm, level: e.target.value })} /></FF>
                 <FF label="CA"><Input type="number" value={charForm.ac} onChange={e => setCharForm({ ...charForm, ac: e.target.value })} /></FF>
                 <FF label="PF attuali"><Input type="number" value={charForm.hp} onChange={e => setCharForm({ ...charForm, hp: e.target.value })} /></FF>
                 <FF label="PF massimi"><Input type="number" value={charForm.max_hp} onChange={e => setCharForm({ ...charForm, max_hp: e.target.value })} /></FF>
@@ -1507,9 +1522,40 @@ function PlayerTab({ player, currentUserId, isDM }) {
                 <Card style={{ marginBottom: 12 }}>
                   <p style={{ fontSize: 12, fontWeight: 700, margin: '0 0 12px', color: T.gold, ...headerFont, letterSpacing: '0.06em' }}>SLOT INCANTESIMO</p>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {slotsT.map((total, i) => { const rem = total - (slotsU[i] || 0); return <div key={i} style={{ textAlign: 'center', background: T.parchmentDark, borderRadius: 4, padding: '8px 12px', minWidth: 52, border: `1px solid ${T.parchmentDarker}` }}><div style={{ fontSize: 11, color: T.gold, marginBottom: 6, ...headerFont }}>Lv {i + 1}</div><div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap' }}>{Array.from({ length: total }).map((_, j) => <div key={j} style={{ width: 10, height: 10, borderRadius: '50%', background: j < rem ? T.purple : T.parchmentDarker, border: `1px solid ${j < rem ? T.purple : T.parchmentDarker}` }} />)}</div><div style={{ fontSize: 12, color: T.inkFaint, marginTop: 6 }}>{rem}/{total}</div></div> })}
+                    {slotsT.map((total, i) => {
+                      const used = slotsU[i] || 0
+                      const rem = total - used
+                      const updateUsed = async (newUsed) => {
+                        const newArr = slotsT.map((_, j) => j === i ? Math.max(0, Math.min(total, newUsed)) : (slotsU[j] || 0))
+                        const newStr = newArr.join(',')
+                        await supabase.from('characters').update({ spell_slots_used: newStr }).eq('id', character.id)
+                        setCharacter(c => ({ ...c, spell_slots_used: newStr }))
+                      }
+                      return (
+                        <div key={i} style={{ textAlign: 'center', background: T.parchmentDark, borderRadius: 4, padding: '8px 12px', minWidth: 52, border: `1px solid ${T.parchmentDarker}` }}>
+                          <div style={{ fontSize: 11, color: T.gold, marginBottom: 6, ...headerFont }}>Lv {i + 1}</div>
+                          <div style={{ display: 'flex', gap: 3, justifyContent: 'center', flexWrap: 'wrap', marginBottom: isOwner ? 6 : 0 }}>
+                            {Array.from({ length: total }).map((_, j) => (
+                              <div key={j} onClick={() => isOwner && updateUsed(j < rem ? used + 1 : used - 1)}
+                                style={{ width: 12, height: 12, borderRadius: '50%', background: j < rem ? T.purple : T.parchmentDarker, border: `1px solid ${j < rem ? T.purple : T.parchmentDarker}`, cursor: isOwner ? 'pointer' : 'default', transition: 'background 0.15s' }} />
+                            ))}
+                          </div>
+                          {isOwner && (
+                            <div style={{ display: 'flex', gap: 4, justifyContent: 'center', alignItems: 'center' }}>
+                              <button onClick={() => updateUsed(used + 1)} disabled={rem === 0}
+                                style={{ width: 20, height: 20, borderRadius: '50%', border: `1px solid ${T.parchmentDarker}`, background: 'transparent', cursor: rem === 0 ? 'not-allowed' : 'pointer', fontSize: 12, color: T.red, opacity: rem === 0 ? 0.4 : 1 }}>−</button>
+                              <span style={{ fontSize: 12, color: T.inkFaint }}>{rem}/{total}</span>
+                              <button onClick={() => updateUsed(used - 1)} disabled={used === 0}
+                                style={{ width: 20, height: 20, borderRadius: '50%', border: `1px solid ${T.parchmentDarker}`, background: 'transparent', cursor: used === 0 ? 'not-allowed' : 'pointer', fontSize: 12, color: T.green, opacity: used === 0 ? 0.4 : 1 }}>+</button>
+                            </div>
+                          )}
+                          {!isOwner && <div style={{ fontSize: 12, color: T.inkFaint }}>{rem}/{total}</div>}
+                        </div>
+                      )
+                    })}
                   </div>
                 </Card>
+              )}
               )}
             </div>
           ) : <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessuna scheda. {isOwner && 'Clicca "Modifica Scheda" per iniziare.'}</p>}
@@ -2142,6 +2188,205 @@ function DiceSection() {
   )
 }
 
+// ─── Iniziativa ───────────────────────────────────────────────────────────────
+function InitiativeSection({ isDM, profile, players }) {
+  const [entries, setEntries] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showAddMonster, setShowAddMonster] = useState(false)
+  const [monsterForm, setMonsterForm] = useState({ name: '', roll: 0, color: T.red })
+  const [myRoll, setMyRoll] = useState('')
+  const [hasSubmitted, setHasSubmitted] = useState(false)
+
+  useEffect(() => {
+    supabase.from('initiative').select('*').order('roll', { ascending: false }).then(({ data }) => {
+      setEntries(data || [])
+      if (data) {
+        const mine = data.find(e => e.player_id === profile.id && !e.is_monster)
+        setHasSubmitted(!!mine)
+        if (mine) setMyRoll(String(mine.roll))
+      }
+      setLoading(false)
+    })
+    // Realtime
+    const ch = supabase.channel('initiative_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'initiative' }, () => {
+        supabase.from('initiative').select('*').order('roll', { ascending: false }).then(({ data }) => {
+          setEntries(data || [])
+          if (data) {
+            const mine = data.find(e => e.player_id === profile.id && !e.is_monster)
+            setHasSubmitted(!!mine)
+            if (mine) setMyRoll(String(mine.roll))
+          }
+        })
+      }).subscribe()
+    return () => supabase.removeChannel(ch)
+  }, [])
+
+  const submitMyRoll = async () => {
+    const roll = parseInt(myRoll)
+    if (isNaN(roll)) return
+    const playerProfile = players.find(p => p.id === profile.id)
+    const existing = entries.find(e => e.player_id === profile.id && !e.is_monster)
+    if (existing) {
+      await supabase.from('initiative').update({ roll }).eq('id', existing.id)
+    } else {
+      await supabase.from('initiative').insert([{
+        name: playerProfile?.username || profile.id,
+        roll,
+        player_id: profile.id,
+        is_monster: false,
+        color: playerProfile?.player_color || T.gold,
+        position: 0,
+        is_active: false
+      }])
+    }
+    setHasSubmitted(true)
+  }
+
+  const addMonster = async () => {
+    if (!monsterForm.name) return
+    await supabase.from('initiative').insert([{
+      name: monsterForm.name,
+      roll: parseInt(monsterForm.roll) || 0,
+      is_monster: true,
+      color: monsterForm.color,
+      position: 0,
+      is_active: false
+    }])
+    setShowAddMonster(false)
+    setMonsterForm({ name: '', roll: 0, color: T.red })
+  }
+
+  const removeEntry = async (id) => {
+    await supabase.from('initiative').delete().eq('id', id)
+  }
+
+  const clearAll = async () => {
+    await supabase.from('initiative').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    setHasSubmitted(false)
+    setMyRoll('')
+  }
+
+  const setActive = async (id) => {
+    // Set all inactive, then set this one active
+    const updates = entries.map(e =>
+      supabase.from('initiative').update({ is_active: e.id === id }).eq('id', e.id)
+    )
+    await Promise.all(updates)
+  }
+
+  const nextTurn = async () => {
+    const activeIdx = entries.findIndex(e => e.is_active)
+    const nextIdx = (activeIdx + 1) % entries.length
+    if (entries.length === 0) return
+    const updates = entries.map((e, i) =>
+      supabase.from('initiative').update({ is_active: i === nextIdx }).eq('id', e.id)
+    )
+    await Promise.all(updates)
+  }
+
+  if (loading) return <p style={{ color: T.inkFaint }}>Caricamento...</p>
+
+  const activeEntry = entries.find(e => e.is_active)
+
+  return (
+    <div>
+      <SH title="⚔️ Iniziativa" action={
+        isDM && <div style={{ display: 'flex', gap: 8 }}>
+          <BtnS onClick={() => setShowAddMonster(true)}>+ Mostro</BtnS>
+          <BtnD onClick={clearAll}>🗑 Azzera</BtnD>
+        </div>
+      } />
+
+      {/* Player roll input */}
+      {!isDM && (
+        <Card style={{ marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: T.inkFaint, marginBottom: 10, fontStyle: 'italic' }}>Inserisci il tuo tiro di iniziativa:</p>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Input type="number" value={myRoll} onChange={e => setMyRoll(e.target.value)}
+              placeholder="es. 14" style={{ maxWidth: 100 }} />
+            <BtnP onClick={submitMyRoll} disabled={!myRoll}>{hasSubmitted ? '↻ Aggiorna' : '✓ Conferma'}</BtnP>
+            {hasSubmitted && <span style={{ fontSize: 13, color: T.green }}>✓ Inviato</span>}
+          </div>
+        </Card>
+      )}
+
+      {/* DM controls */}
+      {isDM && entries.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          <BtnP onClick={nextTurn}>→ Prossimo turno</BtnP>
+          {activeEntry && <span style={{ fontSize: 14, color: T.gold, display: 'flex', alignItems: 'center', fontStyle: 'italic' }}>Turno di: <strong style={{ marginLeft: 6, color: T.ink }}>{activeEntry.name}</strong></span>}
+        </div>
+      )}
+
+      {/* Initiative order */}
+      {entries.length === 0 && <p style={{ color: T.inkFaint, fontStyle: 'italic' }}>Nessun partecipante ancora — inserite i vostri tiri!</p>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {entries.map((entry, idx) => (
+          <div key={entry.id} style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 16px', borderRadius: 8,
+            background: entry.is_active ? `linear-gradient(135deg, ${entry.color || T.gold}33, ${entry.color || T.gold}11)` : idx === 0 ? T.parchmentDark : T.parchment,
+            border: entry.is_active ? `2px solid ${entry.color || T.gold}` : `1.5px solid ${entry.is_monster ? T.red + '66' : T.parchmentDarker}`,
+            boxShadow: entry.is_active ? `0 0 16px ${entry.color || T.gold}44` : 'none',
+            transition: 'all 0.2s',
+          }}>
+            {/* Position number */}
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: entry.color || T.gold, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{idx + 1}</span>
+            </div>
+            {/* Name + type */}
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 16, color: T.ink, ...headerFont }}>{entry.name}</span>
+                {entry.is_monster && <Badge color={T.red}>Mostro</Badge>}
+                {entry.is_active && <Badge color={entry.color || T.gold}>✦ TURNO</Badge>}
+              </div>
+            </div>
+            {/* Roll */}
+            <div style={{ textAlign: 'center', minWidth: 48 }}>
+              <div style={{ fontSize: 11, color: T.inkFaint, ...headerFont }}>INIT</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: T.ink, ...headerFont }}>{entry.roll}</div>
+            </div>
+            {/* DM actions */}
+            {isDM && (
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => setActive(entry.id)}
+                  title="Imposta come turno attivo"
+                  style={{ padding: '4px 8px', background: entry.is_active ? T.gold : T.parchmentDark, border: `1px solid ${T.gold}`, borderRadius: 4, cursor: 'pointer', fontSize: 13, color: entry.is_active ? '#fff' : T.gold, fontWeight: 600 }}>
+                  {entry.is_active ? '★' : '☆'}
+                </button>
+                <button onClick={() => removeEntry(entry.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 4, color: T.inkFaint }}>🗑️</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* DM: add monster modal */}
+      {showAddMonster && (
+        <Modal title="Aggiungi Mostro" onClose={() => setShowAddMonster(false)}>
+          <FF label="Nome"><Input value={monsterForm.name} onChange={e => setMonsterForm({ ...monsterForm, name: e.target.value })} placeholder="es. Goblin, Drago Rosso..." /></FF>
+          <FF label="Tiro iniziativa"><Input type="number" value={monsterForm.roll} onChange={e => setMonsterForm({ ...monsterForm, roll: e.target.value })} /></FF>
+          <FF label="Colore">
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[T.red, T.purple, '#1a4a3c', T.blue, T.inkFaint, '#7a1a4a'].map(c => (
+                <button key={c} onClick={() => setMonsterForm({ ...monsterForm, color: c })}
+                  style={{ width: 32, height: 32, borderRadius: '50%', background: c, border: monsterForm.color === c ? `3px solid ${T.ink}` : `2px solid transparent`, cursor: 'pointer' }} />
+              ))}
+            </div>
+          </FF>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
+            <BtnS onClick={() => setShowAddMonster(false)}>Annulla</BtnS>
+            <BtnP onClick={addMonster}>Aggiungi</BtnP>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
+
 // ─── Cambio password ──────────────────────────────────────────────────────────
 function ChangePasswordModal({ onClose }) {
   const [newPassword, setNewPassword] = useState('')
@@ -2184,6 +2429,7 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
     { id: 'spells', label: 'Incantesimi', icon: '✨' },
     { id: 'party', label: 'Compagnia', icon: '⚔️' },
     { id: 'dadi', label: 'Tira Dadi', icon: '🎲' },
+    { id: 'iniziativa', label: 'Iniziativa', icon: '⚔️' },
     { id: 'messaggi', label: 'Messaggi', icon: '💬' },
   ]
   const DM_ONLY = [{ id: 'note_dm', label: 'Pergamene Segrete', icon: '🔒' }]
@@ -2493,7 +2739,7 @@ ${lootEntry.notes}
     supabase.from('profiles').select('*').order('username').then(({ data }) => setAllContacts(data || []))
   }, [])
 
-  const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
+  const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', iniziativa: '⚔️ Iniziativa', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
   const currentLabel = activeSection.startsWith('player_') ? (players.find(p => p.id === activeSection.replace('player_', ''))?.username || 'Avventuriero') : (LABELS[activeSection] || activeSection)
 
   const renderSection = () => {
@@ -2506,6 +2752,7 @@ ${lootEntry.notes}
     if (activeSection === 'spells') return <SpellsSection />
     if (activeSection === 'party') return <SharedSection isDM={isDM} />
     if (activeSection === 'dadi') return <DiceSection />
+    if (activeSection === 'iniziativa') return <InitiativeSection isDM={isDM} profile={profile} players={players} />
     if (activeSection === 'note_dm' && isDM) return <DMNotesSection />
     if (activeSection === 'messaggi') return <ChatSection profile={profile} players={players} isDM={isDM} allContacts={allContacts} />
     if (activeSection.startsWith('player_')) {
