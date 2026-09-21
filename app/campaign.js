@@ -1246,7 +1246,7 @@ function SpellbookTab({ playerId, isOwner }) {
 }
 
 // ─── Scheda giocatore ─────────────────────────────────────────────────────────
-function PlayerTab({ player, currentUserId, isDM }) {
+function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
   const isOwner = isDM || currentUserId === player.id
   const [activeTab, setActiveTab] = useState('scheda')
   const [character, setCharacter] = useState(null)
@@ -1281,7 +1281,10 @@ function PlayerTab({ player, currentUserId, isDM }) {
       supabase.from('player_session_notes').select('*').eq('player_id', player.id).order('created_at', { ascending: false }),
     ]).then(([c, inv, comp, n]) => {
       const chars = Array.isArray(c.data) ? c.data : (c.data ? [c.data] : [])
-      const active = chars.find(ch => !ch.is_legacy) || chars[0] || null
+      // If viewing a specific legacy char, show that one
+      const active = viewLegacyId
+        ? (chars.find(ch => ch.id === viewLegacyId) || chars.find(ch => !ch.is_legacy) || chars[0] || null)
+        : (chars.find(ch => !ch.is_legacy) || chars[0] || null)
       if (active) { setCharacter(active); setCharForm({ ...EC, ...active }) }
       setAllCharacters(chars)
       setInventory(inv.data || []); setCompanions(comp.data || []); setSessionNotes(n.data || []); setLoading(false)
@@ -2539,17 +2542,16 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
           {playerSections.map(p => (
             <button key={p.id} onClick={() => handleNav('player_' + p.id)} style={btnStyle('player_' + p.id)}>
               <span style={{ width: 10, height: 10, borderRadius: '50%', background: p.player_color || T.gold, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 4px ${p.player_color || T.gold}88` }} />
-              <span style={{ flex: 1 }}>{p.char_name || p.username}</span>
-              {p.char_name && p.char_name !== p.username && <span style={{ fontSize: 10, color: T.inkFaint, fontStyle: 'italic' }}>{p.username}</span>}
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.char_name || p.username}</span>
             </button>
           ))}
         {legacyChars && legacyChars.length > 0 && (
-          <div style={{ padding: '0.5rem 0.75rem' }}>
-            <div style={{ fontSize: 10, color: T.inkFaint, padding: '0 0.25rem', marginBottom: 4, letterSpacing: '0.08em', fontFamily: "'Cinzel', Georgia, serif", opacity: 0.7 }}>CADUTI IN BATTAGLIA</div>
+          <div style={{ padding: '0.5rem 0.75rem', borderTop: `1px solid ${T.gold}22` }}>
+            <div style={{ fontSize: 10, color: T.inkFaint, padding: '0 0.25rem', marginBottom: 6, letterSpacing: '0.08em', fontFamily: "'Cinzel', Georgia, serif", opacity: 0.7 }}>CADUTI IN BATTAGLIA</div>
             {legacyChars.map(c => (
-              <button key={c.id} onClick={() => handleNav('player_' + c.player_id)} style={{ ...btnStyle('player_' + c.player_id), opacity: 0.6 }}>
+              <button key={c.id} onClick={() => handleNav('legacy_' + c.id)} style={{ ...btnStyle('legacy_' + c.id), opacity: 0.7 }}>
                 <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.profiles?.player_color || T.inkFaint, flexShrink: 0, display: 'inline-block' }} />
-                <span style={{ flex: 1, fontStyle: 'italic' }}>✝ {c.name}</span>
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: 'italic' }}>✝ {c.name}</span>
               </button>
             ))}
           </div>
@@ -2829,7 +2831,11 @@ ${lootEntry.notes}
   }, [])
 
   const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', iniziativa: '⚔️ Iniziativa', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
-    const currentLabel = activeSection.startsWith('player_') ? (() => { const p = players.find(p => p.id === activeSection.replace('player_', '')); return p ? (p.char_name || p.username) : '' })() : (LABELS[activeSection] || activeSection)
+    const currentLabel = activeSection.startsWith('player_')
+    ? (() => { const p = players.find(p => p.id === activeSection.replace('player_', '')); return p ? (p.char_name || p.username) : '' })()
+    : activeSection.startsWith('legacy_')
+    ? (() => { const c = legacyChars.find(c => c.id === activeSection.replace('legacy_', '')); return c ? ('✝ ' + c.name) : '' })()
+    : (LABELS[activeSection] || activeSection)
 
   const renderSection = () => {
     if (activeSection === 'sessioni') return <SessionsSection isDM={isDM} />
@@ -2848,6 +2854,14 @@ ${lootEntry.notes}
       const pid = activeSection.replace('player_', '')
       const player = players.find(p => p.id === pid)
       if (player) return <PlayerTab player={player} currentUserId={profile?.id} isDM={isDM} />
+    }
+    if (activeSection.startsWith('legacy_')) {
+      const charId = activeSection.replace('legacy_', '')
+      const legChar = legacyChars.find(c => c.id === charId)
+      if (legChar) {
+        const fakePlayer = { id: legChar.player_id, username: legChar.profiles?.username || '?' }
+        return <PlayerTab player={fakePlayer} currentUserId={profile?.id} isDM={isDM} viewLegacyId={charId} />
+      }
     }
     return null
   }
