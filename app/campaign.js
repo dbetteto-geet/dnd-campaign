@@ -632,6 +632,8 @@ function NPCSection({ isDM }) {
   const [filterAttitude, setFilterAttitude] = useState('')
   const [form, setForm] = useState({ name: '', role: '', attitude: 'Neutrale', description: '', notes_dm: '', image_path: '', vitality: 'vivo', first_location: '', current_location: '', faction: '' })
   const [loading, setLoading] = useState(true)
+  const [allCharacters, setAllCharacters] = useState([])
+  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => { supabase.from('npcs').select('*').order('name').then(({ data }) => { setNpcs(data || []); setLoading(false) }) }, [])
 
@@ -852,6 +854,8 @@ function TimelineSection({ isDM }) {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ date_ingame: '', title: '', description: '', type: 'altro' })
   const [loading, setLoading] = useState(true)
+  const [allCharacters, setAllCharacters] = useState([])
+  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => { supabase.from('timeline_events').select('*').order('created_at').then(({ data }) => { setEvents(data || []); setLoading(false) }) }, [])
 
@@ -981,6 +985,8 @@ function SpellsSection() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [allCharacters, setAllCharacters] = useState([])
+  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => { fetch('https://www.dnd5eapi.co/api/spells?limit=500').then(r => r.json()).then(d => { setSpells((d.results || []).map(s => ({ id: s.index, name: s.name, index: s.index }))); setLoading(false) }).catch(() => setLoading(false)) }, [])
 
@@ -1264,10 +1270,12 @@ function PlayerTab({ player, currentUserId, isDM }) {
   const EN = { session_title: '', date: '', content: '' }
   const [noteForm, setNoteForm] = useState(EN)
   const [loading, setLoading] = useState(true)
+  const [allCharacters, setAllCharacters] = useState([])
+  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => {
     Promise.all([
-      supabase.from('characters').select('*').eq('player_id', player.id).maybeSingle(),
+      supabase.from('characters').select('*').eq('player_id', player.id).order('created_at', { ascending: false }),
       supabase.from('inventory').select('*').eq('player_id', player.id),
       supabase.from('companions').select('*').eq('player_id', player.id),
       supabase.from('player_session_notes').select('*').eq('player_id', player.id).order('created_at', { ascending: false }),
@@ -1278,9 +1286,32 @@ function PlayerTab({ player, currentUserId, isDM }) {
   }, [player.id])
 
   const saveChar = async () => {
-    if (character) { const { data } = await supabase.from('characters').update(charForm).eq('id', character.id).select(); if (data) setCharacter(data[0]) }
-    else { const { data } = await supabase.from('characters').insert([{ ...charForm, player_id: player.id }]).select(); if (data) setCharacter(data[0]) }
+    if (character) {
+      const { data } = await supabase.from('characters').update(charForm).eq('id', character.id).select()
+      if (data) { setCharacter(data[0]); setAllCharacters(prev => prev.map(c => c.id === data[0].id ? data[0] : c)) }
+    } else {
+      const { data } = await supabase.from('characters').insert([{ ...charForm, player_id: player.id, is_legacy: false }]).select()
+      if (data) { setCharacter(data[0]); setAllCharacters(prev => [...prev, data[0]]) }
+    }
     setEditChar(false)
+  }
+
+  const markAsLegacy = async (charId, note) => {
+    const { data } = await supabase.from('characters').update({ is_legacy: true, legacy_note: note }).eq('id', charId).select()
+    if (data) { setAllCharacters(prev => prev.map(c => c.id === charId ? data[0] : c)); setCharacter(null); setCharForm(EC) }
+  }
+
+  const createNewCharacter = () => {
+    setCharacter(null)
+    setCharForm(EC)
+    setEditChar(true)
+  }
+
+  const switchToCharacter = (char) => {
+    setCharacter(char)
+    setCharForm({ ...EC, ...char })
+    setEditChar(false)
+    setShowLegacy(false)
   }
   const handleCoin = async (key, val) => { setCharForm(f => ({ ...f, [key]: val })); if (character) { await supabase.from('characters').update({ [key]: val }).eq('id', character.id); setCharacter(c => ({ ...c, [key]: val })) } }
   const openAddItem = () => { setEditingItem(null); setItemForm(EI); setShowItemModal(true) }
@@ -1893,6 +1924,8 @@ function SharedSection({ isDM }) {
   const [gnoteForm, setGnoteForm] = useState({ session_title: '', date: '', content: '' })
   const [activeTab, setActiveTab] = useState('loot')
   const [loading, setLoading] = useState(true)
+  const [allCharacters, setAllCharacters] = useState([])
+  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => {
     Promise.all([
