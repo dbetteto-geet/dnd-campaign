@@ -2829,7 +2829,7 @@ ${lootEntry.notes}
   }, [])
 
   const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', iniziativa: '⚔️ Iniziativa', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
-    const currentLabel = activeSection.startsWith('player_') ? (() => { const p = players.find(p => p.id === activeSection.replace('player_', '')); return p ? (p.char_name || p.username) : '' })()
+    const currentLabel = activeSection.startsWith('player_') ? (() => { const p = players.find(p => p.id === activeSection.replace('player_', '')); return p ? (p.char_name || p.username) : '' })() : (LABELS[activeSection] || activeSection)
 
   const renderSection = () => {
     if (activeSection === 'sessioni') return <SessionsSection isDM={isDM} />
