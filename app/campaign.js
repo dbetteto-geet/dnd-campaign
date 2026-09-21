@@ -2480,7 +2480,7 @@ function ChangePasswordModal({ onClose }) {
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
-function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM, onChangePassword, onExport, unreadCount, onChatOpen }) {
+function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, isOpen, onClose, isDM, onChangePassword, onExport, unreadCount, onChatOpen, legacyChars }) {
   const DM_SECTIONS = [
     { id: 'sessioni', label: 'Sessioni', icon: '📜' },
     { id: 'npc', label: 'NPC', icon: '⚔' },
@@ -2536,7 +2536,24 @@ function Sidebar({ profile, players, activeSection, setActiveSection, onLogout, 
           <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
           <div style={{ height: 1, background: `linear-gradient(to right, transparent, ${T.gold}44, transparent)`, margin: '12px 8px' }} />
           <div style={{ fontSize: 10, color: T.goldLight, padding: '0 0.75rem', marginBottom: 6, letterSpacing: '0.1em', fontFamily: "'Cinzel', Georgia, serif" }}>LA COMPAGNIA</div>
-          {playerSections.map(p => <button key={p.id} onClick={() => handleNav('player_' + p.id)} style={btnStyle('player_' + p.id)}><span style={{ width: 10, height: 10, borderRadius: '50%', background: p.player_color || T.gold, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 4px ${p.player_color || T.gold}88` }} />{p.username}</button>)}
+          {playerSections.map(p => (
+            <button key={p.id} onClick={() => handleNav('player_' + p.id)} style={btnStyle('player_' + p.id)}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: p.player_color || T.gold, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 4px ${p.player_color || T.gold}88` }} />
+              <span style={{ flex: 1 }}>{p.char_name || p.username}</span>
+              {p.char_name && p.char_name !== p.username && <span style={{ fontSize: 10, color: T.inkFaint, fontStyle: 'italic' }}>{p.username}</span>}
+            </button>
+          ))}
+        {legacyChars && legacyChars.length > 0 && (
+          <div style={{ padding: '0.5rem 0.75rem' }}>
+            <div style={{ fontSize: 10, color: T.inkFaint, padding: '0 0.25rem', marginBottom: 4, letterSpacing: '0.08em', fontFamily: "'Cinzel', Georgia, serif", opacity: 0.7 }}>CADUTI IN BATTAGLIA</div>
+            {legacyChars.map(c => (
+              <button key={c.id} onClick={() => handleNav('player_' + c.player_id)} style={{ ...btnStyle('player_' + c.player_id), opacity: 0.6 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: c.profiles?.player_color || T.inkFaint, flexShrink: 0, display: 'inline-block' }} />
+                <span style={{ flex: 1, fontStyle: 'italic' }}>✝ {c.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
         </div>
         <div style={{ padding: '0.75rem', borderTop: `1px solid ${T.gold}33`, display: 'flex', flexDirection: 'column', gap: 8 }}>
           {isDM && <button onClick={() => { onClose(); onExport() }} style={{ width: '100%', padding: '10px 12px', borderRadius: 4, border: `1px solid ${T.green}44`, background: `${T.green}11`, fontSize: 14, cursor: 'pointer', color: T.parchmentDarker, textAlign: 'left', minHeight: 44, fontFamily: "'Crimson Text', Georgia, serif" }}>📦 Esporta Knowledge Base</button>}
@@ -2796,13 +2813,23 @@ ${lootEntry.notes}
   }
 
   const [allContacts, setAllContacts] = useState([])
+  const [legacyChars, setLegacyChars] = useState([])
   useEffect(() => {
-    supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => setPlayers(data || []))
+    supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => {
+      const profs = data || []
+      // Load active character names for each player
+      supabase.from('characters').select('player_id, name, is_legacy').eq('is_legacy', false).then(({ data: chars }) => {
+        const charMap = {}
+        ;(chars || []).forEach(c => { charMap[c.player_id] = c.name })
+        setPlayers(profs.map(p => ({ ...p, char_name: charMap[p.id] || null })))
+      })
+    })
     supabase.from('profiles').select('*').order('username').then(({ data }) => setAllContacts(data || []))
+    supabase.from('characters').select('*, profiles(username, player_color)').eq('is_legacy', true).then(({ data }) => setLegacyChars(data || []))
   }, [])
 
   const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', iniziativa: '⚔️ Iniziativa', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
-  const currentLabel = activeSection.startsWith('player_') ? (players.find(p => p.id === activeSection.replace('player_', ''))?.username || 'Avventuriero') : (LABELS[activeSection] || activeSection)
+    const currentLabel = activeSection.startsWith('player_') ? (() => { const p = players.find(p => p.id === activeSection.replace('player_', '')); return p ? (p.char_name || p.username) : '' })()
 
   const renderSection = () => {
     if (activeSection === 'sessioni') return <SessionsSection isDM={isDM} />
@@ -2838,7 +2865,7 @@ ${lootEntry.notes}
         {exporting && <span style={{ fontSize: 12, color: T.goldLight, fontStyle: 'italic' }}>⏳ Esportazione...</span>}
         <span style={{ fontSize: 13, color: T.goldLight, fontStyle: 'italic' }}>{profile?.username}</span>
       </div>
-      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} onExport={exportKnowledgeBase} unreadCount={unreadCount} onChatOpen={() => setUnreadCount(0)} />
+      <Sidebar profile={profile} players={players} activeSection={activeSection} setActiveSection={setActiveSectionPersist} onLogout={onLogout} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} isDM={isDM} onChangePassword={() => setShowPasswordModal(true)} onExport={exportKnowledgeBase} unreadCount={unreadCount} onChatOpen={() => setUnreadCount(0)} legacyChars={legacyChars} />
       <div style={{ padding: '1.25rem 1rem', maxWidth: 1200, margin: '0 auto' }}>
         <div style={{ ...parchmentBg, borderRadius: 8, padding: '1.5rem', minHeight: 'calc(100vh - 80px)', boxShadow: '0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3)', border: `1px solid ${T.parchmentDarker}` }}>
           {renderSection()}
