@@ -1280,7 +1280,10 @@ function PlayerTab({ player, currentUserId, isDM }) {
       supabase.from('companions').select('*').eq('player_id', player.id),
       supabase.from('player_session_notes').select('*').eq('player_id', player.id).order('created_at', { ascending: false }),
     ]).then(([c, inv, comp, n]) => {
-      if (c.data) { setCharacter(c.data); setCharForm({ ...EC, ...c.data }) }
+      const chars = Array.isArray(c.data) ? c.data : (c.data ? [c.data] : [])
+      const active = chars.find(ch => !ch.is_legacy) || chars[0] || null
+      if (active) { setCharacter(active); setCharForm({ ...EC, ...active }) }
+      setAllCharacters(chars)
       setInventory(inv.data || []); setCompanions(comp.data || []); setSessionNotes(n.data || []); setLoading(false)
     })
   }, [player.id])
@@ -1367,7 +1370,36 @@ function PlayerTab({ player, currentUserId, isDM }) {
       {activeTab === 'scheda' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            {isOwner && (editChar ? <div style={{ display: 'flex', gap: 8 }}><BtnS onClick={() => setEditChar(false)}>Annulla</BtnS><BtnP onClick={saveChar}>Sigilla</BtnP></div> : <BtnS onClick={() => { setCharForm({ ...EC, ...(character || {}) }); setEditChar(true) }}>Modifica Scheda</BtnS>)}
+            {isOwner && (editChar
+              ? <div style={{ display: 'flex', gap: 8 }}><BtnS onClick={() => setEditChar(false)}>Annulla</BtnS><BtnP onClick={saveChar}>Sigilla</BtnP></div>
+              : <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <BtnS onClick={() => { setCharForm({ ...EC, ...(character || {}) }); setEditChar(true) }}>Modifica Scheda</BtnS>
+                  {isDM && character && !character.is_legacy && <BtnD onClick={() => { if (window.confirm('Segnare ' + character.name + ' come caduto?')) markAsLegacy(character.id, 'Caduto in battaglia') }}>⚔️ Legacy</BtnD>}
+                  {isOwner && <BtnP onClick={createNewCharacter}>+ Nuovo PG</BtnP>}
+                </div>
+            )}
+            {allCharacters.filter(c => c.is_legacy).length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <button onClick={() => setShowLegacy(p => !p)}
+                  style={{ fontSize: 13, color: T.inkFaint, background: 'none', border: `1px solid ${T.parchmentDarker}`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontFamily: "'Crimson Text', Georgia, serif" }}>
+                  {showLegacy ? '▲ Nascondi' : '▼ Personaggi caduti (' + allCharacters.filter(c => c.is_legacy).length + ')'}
+                </button>
+                {showLegacy && (
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {allCharacters.filter(c => c.is_legacy).map(lc => (
+                      <div key={lc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.parchmentDark, border: `1px solid ${T.parchmentDarker}`, borderRadius: 6, padding: '8px 12px' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, color: T.inkFaint, fontFamily: "'Cinzel', Georgia, serif" }}>✝ {lc.name}</span>
+                          <span style={{ fontSize: 13, color: T.inkFaint, marginLeft: 8 }}>{lc.race} {lc.class} Lv {lc.level}</span>
+                          {lc.legacy_note && <span style={{ fontSize: 12, color: T.inkFaint, fontStyle: 'italic', marginLeft: 8 }}>({lc.legacy_note})</span>}
+                        </div>
+                        <BtnS onClick={() => switchToCharacter(lc)}>Visualizza</BtnS>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           {editChar ? (
             <Card>
