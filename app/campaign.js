@@ -633,7 +633,6 @@ function NPCSection({ isDM }) {
   const [form, setForm] = useState({ name: '', role: '', attitude: 'Neutrale', description: '', notes_dm: '', image_path: '', vitality: 'vivo', first_location: '', current_location: '', faction: '' })
   const [loading, setLoading] = useState(true)
   const [allCharacters, setAllCharacters] = useState([])
-  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => { supabase.from('npcs').select('*').order('name').then(({ data }) => { setNpcs(data || []); setLoading(false) }) }, [])
 
@@ -855,7 +854,6 @@ function TimelineSection({ isDM }) {
   const [form, setForm] = useState({ date_ingame: '', title: '', description: '', type: 'altro' })
   const [loading, setLoading] = useState(true)
   const [allCharacters, setAllCharacters] = useState([])
-  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => { supabase.from('timeline_events').select('*').order('created_at').then(({ data }) => { setEvents(data || []); setLoading(false) }) }, [])
 
@@ -986,7 +984,6 @@ function SpellsSection() {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [allCharacters, setAllCharacters] = useState([])
-  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => { fetch('https://www.dnd5eapi.co/api/spells?limit=500').then(r => r.json()).then(d => { setSpells((d.results || []).map(s => ({ id: s.index, name: s.name, index: s.index }))); setLoading(false) }).catch(() => setLoading(false)) }, [])
 
@@ -1271,7 +1268,6 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
   const [noteForm, setNoteForm] = useState(EN)
   const [loading, setLoading] = useState(true)
   const [allCharacters, setAllCharacters] = useState([])
-  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -1313,12 +1309,7 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
     setEditChar(true)
   }
 
-  const switchToCharacter = (char) => {
-    setCharacter(char)
-    setCharForm({ ...EC, ...char })
-    setEditChar(false)
-    setShowLegacy(false)
-  }
+
   const handleCoin = async (key, val) => { setCharForm(f => ({ ...f, [key]: val })); if (character) { await supabase.from('characters').update({ [key]: val }).eq('id', character.id); setCharacter(c => ({ ...c, [key]: val })) } }
   const openAddItem = () => { setEditingItem(null); setItemForm(EI); setShowItemModal(true) }
   const openEditItem = (item) => { setEditingItem(item); setItemForm({ name: item.name, type: item.type, description: item.description || '', quantity: item.quantity }); setShowItemModal(true) }
@@ -1364,7 +1355,10 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
         {imgUrl ? <img src={imgUrl} alt="" style={{ width: 60, height: 60, borderRadius: '50%', objectFit: 'cover', border: `3px solid ${player.player_color || T.gold}`, flexShrink: 0, boxShadow: '0 2px 8px rgba(44,24,16,0.3)' }} />
           : <div style={{ width: 60, height: 60, borderRadius: '50%', background: (player.player_color || T.gold) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, fontWeight: 600, color: player.player_color || T.gold, border: `3px solid ${player.player_color || T.gold}`, flexShrink: 0, ...headerFont }}>{player.username[0]}</div>}
         <div>
-          <div style={{ fontWeight: 700, fontSize: 19, color: T.ink, ...headerFont }}>{character?.name || player.username}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 700, fontSize: 19, color: character?.is_legacy ? T.inkFaint : T.ink, ...headerFont }}>{character?.name || player.username}</span>
+            {character?.is_legacy && <span style={{ fontSize: 11, color: T.inkFaint, border: `1px solid ${T.parchmentDarker}`, borderRadius: 4, padding: '2px 6px', fontStyle: 'italic' }}>✝ sola lettura</span>}
+          </div>
           {character && <div style={{ fontSize: 15, color: T.inkFaint, fontStyle: 'italic' }}>{character.race} · {character.class}{character.multiclass && character.class2 ? ` ${character.level}/${character.class2} ${character.level2}` : ''} · Livello {character.multiclass && character.class2 ? (parseInt(character.level||0) + parseInt(character.level2||0)) : character.level}</div>}
         </div>
       </div>
@@ -1373,36 +1367,18 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
       {activeTab === 'scheda' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            {isOwner && (editChar
+            {isOwner && !character?.is_legacy && (editChar
               ? <div style={{ display: 'flex', gap: 8 }}><BtnS onClick={() => setEditChar(false)}>Annulla</BtnS><BtnP onClick={saveChar}>Sigilla</BtnP></div>
               : <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <BtnS onClick={() => { setCharForm({ ...EC, ...(character || {}) }); setEditChar(true) }}>Modifica Scheda</BtnS>
-                  {isDM && character && !character.is_legacy && <BtnD onClick={() => { if (window.confirm('Segnare ' + character.name + ' come caduto?')) markAsLegacy(character.id, 'Caduto in battaglia') }}>⚔️ Legacy</BtnD>}
-                  {isOwner && <BtnP onClick={createNewCharacter}>+ Nuovo PG</BtnP>}
+                  {isDM && character && <BtnD onClick={() => { if (window.confirm('Segnare ' + character.name + ' come caduto in battaglia?')) markAsLegacy(character.id, 'Caduto in battaglia') }}>⚔️ Legacy</BtnD>}
                 </div>
             )}
-            {allCharacters.filter(c => c.is_legacy).length > 0 && (
-              <div style={{ marginTop: 8 }}>
-                <button onClick={() => setShowLegacy(p => !p)}
-                  style={{ fontSize: 13, color: T.inkFaint, background: 'none', border: `1px solid ${T.parchmentDarker}`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontFamily: "'Crimson Text', Georgia, serif" }}>
-                  {showLegacy ? '▲ Nascondi' : '▼ Personaggi caduti (' + allCharacters.filter(c => c.is_legacy).length + ')'}
-                </button>
-                {showLegacy && (
-                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {allCharacters.filter(c => c.is_legacy).map(lc => (
-                      <div key={lc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.parchmentDark, border: `1px solid ${T.parchmentDarker}`, borderRadius: 6, padding: '8px 12px' }}>
-                        <div>
-                          <span style={{ fontWeight: 600, color: T.inkFaint, fontFamily: "'Cinzel', Georgia, serif" }}>✝ {lc.name}</span>
-                          <span style={{ fontSize: 13, color: T.inkFaint, marginLeft: 8 }}>{lc.race} {lc.class} Lv {lc.level}</span>
-                          {lc.legacy_note && <span style={{ fontSize: 12, color: T.inkFaint, fontStyle: 'italic', marginLeft: 8 }}>({lc.legacy_note})</span>}
-                        </div>
-                        <BtnS onClick={() => switchToCharacter(lc)}>Visualizza</BtnS>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {character?.is_legacy && <p style={{ fontSize: 13, color: T.inkFaint, fontStyle: 'italic', margin: 0 }}>Scheda in sola lettura</p>}
+            {!character && isOwner && !editChar && (
+              <BtnP onClick={createNewCharacter}>+ Crea Personaggio</BtnP>
             )}
+            
           </div>
           {editChar ? (
             <Card>
@@ -1960,7 +1936,6 @@ function SharedSection({ isDM }) {
   const [activeTab, setActiveTab] = useState('loot')
   const [loading, setLoading] = useState(true)
   const [allCharacters, setAllCharacters] = useState([])
-  const [showLegacy, setShowLegacy] = useState(false)
 
   useEffect(() => {
     Promise.all([
