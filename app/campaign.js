@@ -1285,7 +1285,7 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
       setAllCharacters(chars)
       setInventory(inv.data || []); setCompanions(comp.data || []); setSessionNotes(n.data || []); setLoading(false)
     })
-  }, [player.id])
+  }, [player.id, viewLegacyId])
 
   const saveChar = async () => {
     if (character) {
@@ -2792,17 +2792,26 @@ ${lootEntry.notes}
   const [allContacts, setAllContacts] = useState([])
   const [legacyChars, setLegacyChars] = useState([])
   useEffect(() => {
-    supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => {
+    const reloadPlayers = () => supabase.from('profiles').select('*').eq('role', 'player').order('username').then(({ data }) => {
       const profs = data || []
-      // Load active character names for each player
       supabase.from('characters').select('player_id, name, is_legacy').eq('is_legacy', false).then(({ data: chars }) => {
         const charMap = {}
         ;(chars || []).forEach(c => { charMap[c.player_id] = c.name })
         setPlayers(profs.map(p => ({ ...p, char_name: charMap[p.id] || null })))
       })
     })
+    reloadPlayers()
+    const playersCh = supabase.channel('players_chars_watch')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'characters' }, () => { reloadPlayers() })
+      .subscribe()
     supabase.from('profiles').select('*').order('username').then(({ data }) => setAllContacts(data || []))
-    supabase.from('characters').select('*, profiles(username, player_color)').eq('is_legacy', true).then(({ data }) => setLegacyChars(data || []))
+    const reloadLegacy = () => supabase.from('characters').select('*, profiles(username, player_color)').eq('is_legacy', true).then(({ data }) => setLegacyChars(data || []))
+    reloadLegacy()
+    // Reload when characters change
+    const legacyCh = supabase.channel('legacy_chars_watch')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'characters' }, () => reloadLegacy())
+      .subscribe()
+    return () => supabase.removeChannel(legacyCh)
   }, [])
 
   const LABELS = { sessioni: '📜 Sessioni', npc: '⚔ NPC', mappa: '🗺️ Mappa', fazioni: '⚜ Fazioni', lore: '📖 Lore', timeline: '📅 Cronaca', spells: '✨ Incantesimi', party: '⚔️ Compagnia', dadi: '🎲 Tira Dadi', iniziativa: '⚔️ Iniziativa', note_dm: '🔒 Pergamene Segrete', messaggi: '💬 Messaggi' }
