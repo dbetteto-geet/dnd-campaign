@@ -1,3 +1,8 @@
+// =====================================================================
+// DUNGEONS & CINGHIALI
+// File: app/campaign.js del repo dnd-campaign (progetto Vercel dnd-campaign)
+// Campagna nel database: campaign_id = 'cinghiali'
+// =====================================================================
 'use client'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
@@ -163,6 +168,11 @@ const ITEM_TYPE_COLORS = { 'Arma magica': T.purple, Consumabile: T.green, Armatu
 const VITALITY_COLORS = { vivo: '#1a5c2e', morto: '#8b1a1a', sconosciuto: '#8b6355' }
 const SCHOOL_COLORS = { Evocazione: T.red, Illusione: T.purple, Necromanzia: T.inkFaint, Trasformazione: T.green, Divinazione: T.blue, Ammaliamento: '#7a1a4a', Abiurazione: T.gold, Invocazione: '#1a4a3c' }
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
+
+function formatBonus(v) {
+  const n = parseInt(v) || 0
+  return n >= 0 ? `+${n}` : `${n}`
+}
 
 function getPublicUrl(bucket, path) {
   if (!path) return null
@@ -915,8 +925,10 @@ function MapSection({ isDM }) {
 
   useEffect(() => {
     supabase.from('map_pins').select('*').then(({ data }) => { setPins(data || []); setLoading(false) })
+    // Ignora le cartelle (es. sunless/), cosi' non scambia la cartella per la mappa
     supabase.storage.from('map-images').list('').then(({ data }) => {
-      if (data && data.length > 0) { const f = data.find(f => f.name.startsWith('map.')) || data[data.length - 1]; setMapUrl(getPublicUrl('map-images', f.name) + '?t=' + Date.now()) }
+      const files = (data || []).filter(f => f.id)
+      if (files.length > 0) { const f = files.find(f => f.name.startsWith('map.')) || files[files.length - 1]; setMapUrl(getPublicUrl('map-images', f.name) + '?t=' + Date.now()) }
     })
   }, [])
 
@@ -1258,7 +1270,7 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
   const [showNoteModal, setShowNoteModal] = useState(false)
   const [editingNote, setEditingNote] = useState(null)
   const [expandedNote, setExpandedNote] = useState(null)
-  const EC = { name: '', class: '', race: '', level: 1, hp: 10, max_hp: 10, ac: 10, background: '', image_path: '', str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, attacks: '', spell_slots_total: '', spell_slots_used: '', gold: 0, silver: 0, copper: 0, platinum: 0 }
+  const EC = { name: '', class: '', race: '', level: 1, hp: 10, max_hp: 10, ac: 10, initiative_bonus: 0, background: '', image_path: '', str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10, attacks: '', spell_slots_total: '', spell_slots_used: '', gold: 0, silver: 0, copper: 0, platinum: 0 }
   const [charForm, setCharForm] = useState(EC)
   const EI = { name: '', type: 'Vari', description: '', quantity: 1 }
   const [itemForm, setItemForm] = useState(EI)
@@ -1288,11 +1300,12 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
   }, [player.id, viewLegacyId])
 
   const saveChar = async () => {
+    const payload = { ...charForm, initiative_bonus: parseInt(charForm.initiative_bonus) || 0 }
     if (character) {
-      const { data } = await supabase.from('characters').update(charForm).eq('id', character.id).select()
+      const { data } = await supabase.from('characters').update(payload).eq('id', character.id).select()
       if (data) { setCharacter(data[0]); setAllCharacters(prev => prev.map(c => c.id === data[0].id ? data[0] : c)) }
     } else {
-      const { data } = await supabase.from('characters').insert([{ ...charForm, player_id: player.id, is_legacy: false }]).select()
+      const { data } = await supabase.from('characters').insert([{ ...payload, player_id: player.id, is_legacy: false }]).select()
       if (data) { setCharacter(data[0]); setAllCharacters(prev => [...prev, data[0]]) }
     }
     setEditChar(false)
@@ -1406,6 +1419,7 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
                 <FF label="Background"><Input value={charForm.background} onChange={e => setCharForm({ ...charForm, background: e.target.value })} /></FF>
                 <FF label={charForm.multiclass ? "Livello (classe principale)" : "Livello"}><Input type="number" value={charForm.level} onChange={e => setCharForm({ ...charForm, level: e.target.value })} /></FF>
                 <FF label="CA"><Input type="number" value={charForm.ac} onChange={e => setCharForm({ ...charForm, ac: e.target.value })} /></FF>
+                <FF label="Bonus iniziativa"><Input type="number" value={charForm.initiative_bonus ?? 0} onChange={e => setCharForm({ ...charForm, initiative_bonus: e.target.value })} placeholder="es. 2 o -1" /></FF>
                 <FF label="PF attuali"><Input type="number" value={charForm.hp} onChange={e => setCharForm({ ...charForm, hp: e.target.value })} /></FF>
                 <FF label="PF massimi"><Input type="number" value={charForm.max_hp} onChange={e => setCharForm({ ...charForm, max_hp: e.target.value })} /></FF>
               </div>
@@ -1420,7 +1434,7 @@ function PlayerTab({ player, currentUserId, isDM, viewLegacyId }) {
           ) : character ? (
             <div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 120px), 1fr))', gap: 10, marginBottom: 12 }}>
-                {[['Classe Armatura', character.ac], ['Livello', character.level], ['Background', character.background]].map(([k, v]) => <div key={k} style={{ ...cardStyle, textAlign: 'center' }}><div style={{ fontSize: 11, color: T.gold, marginBottom: 4, ...headerFont, letterSpacing: '0.05em' }}>{k.toUpperCase()}</div><div style={{ fontSize: 18, fontWeight: 700, color: T.ink, ...headerFont }}>{v}</div></div>)}
+                {[['Classe Armatura', character.ac], ['Iniziativa', formatBonus(character.initiative_bonus)], ['Livello', character.level], ['Background', character.background]].map(([k, v]) => <div key={k} style={{ ...cardStyle, textAlign: 'center' }}><div style={{ fontSize: 11, color: T.gold, marginBottom: 4, ...headerFont, letterSpacing: '0.05em' }}>{k.toUpperCase()}</div><div style={{ fontSize: 18, fontWeight: 700, color: T.ink, ...headerFont }}>{v}</div></div>)}
               </div>
               <Card style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
