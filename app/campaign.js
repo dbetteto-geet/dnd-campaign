@@ -1884,7 +1884,7 @@ function ChatSection({ profile, players, isDM, allContacts }) {
             <button key={c.id} onClick={() => openConversation(c)}
               style={{ padding: '8px 14px', borderRadius: 20, border: selectedUser?.id === c.id ? `2px solid ${T.gold}` : `1px solid ${T.parchmentDarker}`, background: selectedUser?.id === c.id ? T.gold + '22' : T.parchmentDark, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: c.player_color || T.gold, flexShrink: 0 }} />
-              <span style={{ fontSize: 14, color: T.ink, fontWeight: selectedUser?.id === c.id ? 700 : 400, fontFamily: "'Crimson Text', Georgia, serif" }}>{c.username}</span>
+              <span style={{ fontSize: 14, color: T.ink, fontWeight: selectedUser?.id === c.id ? 700 : 400, fontFamily: "'Crimson Text', Georgia, serif" }}>{c.char_name || c.username}</span>
               {u > 0 && <span style={{ background: T.red, color: '#fff', borderRadius: 10, minWidth: 18, height: 18, fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>{u}</span>}
             </button>
           )
@@ -1896,7 +1896,7 @@ function ChatSection({ profile, players, isDM, allContacts }) {
         <div style={{ border: `1.5px solid ${T.parchmentDarker}`, borderRadius: 8, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '10px 14px', background: T.parchmentDark, borderBottom: `1px solid ${T.parchmentDarker}`, display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: selectedUser.player_color || T.gold }} />
-            <span style={{ fontWeight: 700, color: T.ink, fontFamily: "'Cinzel', Georgia, serif", fontSize: 14 }}>{selectedUser.username}</span>
+            <span style={{ fontWeight: 700, color: T.ink, fontFamily: "'Cinzel', Georgia, serif", fontSize: 14 }}>{selectedUser.char_name || selectedUser.username}</span>
             <span style={{ fontSize: 11, color: T.inkFaint, fontStyle: 'italic' }}>— conversazione privata</span>
           </div>
           <div style={{ height: 320, overflowY: 'auto', padding: '12px', background: T.parchment, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1918,7 +1918,7 @@ function ChatSection({ profile, players, isDM, allContacts }) {
           <div style={{ padding: '8px 10px', background: T.parchmentDark, borderTop: `1px solid ${T.parchmentDarker}`, display: 'flex', gap: 8, alignItems: 'center' }}>
             <input ref={inputRef} value={newMsg} onChange={e => setNewMsg(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg() } }}
-              placeholder={'Messaggio a ' + selectedUser.username + '...'}
+              placeholder={'Messaggio a ' + (selectedUser.char_name || selectedUser.username) + '...'}
               style={{ flex: 1, padding: '10px 14px', border: `1px solid ${T.parchmentDarker}`, borderRadius: 20, background: T.parchment, fontSize: 14, color: T.ink, outline: 'none', minWidth: 0 }} />
             <button onClick={sendMsg} disabled={!newMsg.trim()}
               style={{ width: 40, height: 40, borderRadius: '50%', background: newMsg.trim() ? T.gold : T.parchmentDarker, border: 'none', cursor: newMsg.trim() ? 'pointer' : 'not-allowed', color: '#fff', fontWeight: 700, fontSize: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>→</button>
@@ -2280,7 +2280,7 @@ function InitiativeSection({ isDM, profile, players }) {
       await supabase.from('initiative').update({ roll }).eq('id', existing.id)
     } else {
       await supabase.from('initiative').insert([{
-        name: playerProfile?.username || 'Giocatore',
+        name: playerProfile?.char_name || playerProfile?.username || 'Giocatore',
         roll, player_id: profile.id, is_monster: false,
         color: playerProfile?.player_color || T.gold,
         position: 0, is_active: false
@@ -2818,7 +2818,14 @@ ${lootEntry.notes}
     const playersCh = supabase.channel('players_chars_watch')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'characters' }, () => { reloadPlayers() })
       .subscribe()
-    supabase.from('profiles').select('*').order('username').then(({ data }) => setAllContacts(data || []))
+    supabase.from('profiles').select('*').order('username').then(({ data }) => {
+      const contacts = data || []
+      supabase.from('characters').select('player_id, name, is_legacy').eq('is_legacy', false).then(({ data: chars }) => {
+        const charMap = {}
+        ;(chars || []).forEach(c => { charMap[c.player_id] = c.name })
+        setAllContacts(contacts.map(p => ({ ...p, char_name: charMap[p.id] || null })))
+      })
+    })
     const reloadLegacy = () => supabase.from('characters').select('*, profiles(username, player_color)').eq('is_legacy', true).then(({ data }) => setLegacyChars(data || []))
     reloadLegacy()
     // Reload when characters change
